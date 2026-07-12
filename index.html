@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reelrod — pocket booklet builder</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <aside id="sidebar">
+      <header>
+        <h1>Reelrod</h1>
+        <p class="tagline">Pocket booklet builder — 8 pages, one sheet, one cut.</p>
+      </header>
+
+      <section>
+        <h2>Sheet</h2>
+        <div class="field-row">
+          <label for="paper">Paper</label>
+          <select id="paper"></select>
+        </div>
+        <label class="check"><input type="checkbox" id="showGuides" /> Fold &amp; cut guides</label>
+        <label class="check"><input type="checkbox" id="showPageNumbers" /> Page numbers</label>
+      </section>
+
+      <section>
+        <h2>Cover</h2>
+        <div class="field-row">
+          <label for="title">Title</label>
+          <input type="text" id="title" value="My Booklet" />
+        </div>
+        <div class="field-row">
+          <label for="subtitle">Subtitle</label>
+          <input type="text" id="subtitle" value="" placeholder="optional" />
+        </div>
+      </section>
+
+      <section>
+        <h2>Calendar</h2>
+        <div class="field-row">
+          <label for="month">Start month</label>
+          <select id="month"></select>
+          <input type="number" id="year" min="1970" max="2999" />
+        </div>
+        <p class="hint">Each calendar page can pick its own month; “Auto” continues
+        from the previous calendar page.</p>
+      </section>
+
+      <section>
+        <h2>Pages</h2>
+        <div id="pages"></div>
+      </section>
+
+      <button id="download">Download PDF</button>
+
+      <footer>
+        <p>Print at 100% scale. Fold in half 3 times to crease, unfold, cut the
+        marked slit in the middle, then fold into a booklet.</p>
+      </footer>
+    </aside>
+
+    <main id="preview-pane">
+      <iframe id="preview" title="PDF preview"></iframe>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
