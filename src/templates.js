@@ -12,7 +12,15 @@ import {
 const LINE = rgb(0.72, 0.76, 0.8)
 const FAINT = rgb(0.85, 0.88, 0.91)
 const INK = rgb(0.15, 0.17, 0.2)
+const BLACK = rgb(0, 0, 0)
+const WHITE = rgb(1, 1, 1)
 const MARGIN = 16
+
+// Label bands (day tabs, header rows) are normally dark text on a gray fill;
+// high-contrast mode swaps them to white text on black.
+function bandColors(settings) {
+  return settings?.highContrast ? { bg: BLACK, fg: WHITE } : { bg: FAINT, fg: INK }
+}
 
 function blank() {}
 
@@ -125,7 +133,8 @@ function storyboard({ page, w, h }) {
   }
 }
 
-function ledger({ page, w, h, font, bold }, rowH = 15) {
+function ledger({ page, w, h, font, bold, settings }, rowH = 15) {
+  const { bg, fg } = bandColors(settings)
   // Drawn sideways: turn the booklet 90° clockwise to use the register.
   // Landscape drawing space is (h wide, w tall) mapped onto the portrait cell.
   page.pushOperators(pushGraphicsState(), concatTransformationMatrix(0, 1, -1, 0, w, 0))
@@ -153,7 +162,7 @@ function ledger({ page, w, h, font, bold }, rowH = 15) {
     y: headerBase,
     width: right - left,
     height: headerH,
-    color: FAINT,
+    color: bg,
   })
   let cx = left
   for (const col of cols) {
@@ -162,7 +171,7 @@ function ledger({ page, w, h, font, bold }, rowH = 15) {
       y: headerBase + (headerH - headerSize) / 2 + 1,
       size: headerSize,
       font: bold,
-      color: INK,
+      color: fg,
     })
     cx += col.width
   }
@@ -300,26 +309,23 @@ function ordinal(n) {
   return `${n}${suffix}`
 }
 
-function week({ page, w, h, font, bold, weekDate }) {
+// "Monday 13th" when the week's date is known, plain "Monday" otherwise.
+// offset is the day's distance from the week anchor (the week's Sunday).
+function dayTabLabel(name, weekDate, offset) {
+  if (!weekDate) return name
+  const date = new Date(weekDate.getFullYear(), weekDate.getMonth(), weekDate.getDate() + offset)
+  return `${name} ${ordinal(date.getDate())}`
+}
+
+function week({ page, w, h, font, bold, settings, weekDate }) {
   const left = MARGIN
   const right = w - MARGIN
   const bottom = MARGIN
+  const { bg, fg } = bandColors(settings)
 
-  // Automatic week date (the week's Sunday, e.g. "Jul 12th"), top-right corner.
-  const headerY = h - MARGIN - 7
-  if (weekDate) {
-    const label = `${MONTHS[weekDate.getMonth()].slice(0, 3)} ${ordinal(weekDate.getDate())}`
-    page.drawText(label, {
-      x: right - bold.widthOfTextAtSize(label, 7),
-      y: headerY,
-      size: 7,
-      font: bold,
-      color: INK,
-    })
-  }
-
-  const top = headerY - 8
+  const top = h - MARGIN
   const rowH = (top - bottom) / 7
+
   for (let d = 0; d < 7; d++) {
     const rowTop = top - d * rowH
     page.drawLine({
@@ -328,20 +334,21 @@ function week({ page, w, h, font, bold, weekDate }) {
       thickness: 0.6,
       color: LINE,
     })
-    // Gray tab behind the day name, only as wide as the text.
+    // Tab behind the day name, only as wide as the text.
+    const name = dayTabLabel(DAY_NAMES[d], weekDate, d)
     page.drawRectangle({
       x: left,
       y: rowTop - 12.5,
-      width: bold.widthOfTextAtSize(DAY_NAMES[d], 7) + 8,
+      width: bold.widthOfTextAtSize(name, 7) + 8,
       height: 12,
-      color: FAINT,
+      color: bg,
     })
-    page.drawText(DAY_NAMES[d], {
+    page.drawText(name, {
       x: left + 4,
       y: rowTop - 9,
       size: 7,
       font: bold,
-      color: INK,
+      color: fg,
     })
   }
   page.drawLine({
@@ -352,7 +359,68 @@ function week({ page, w, h, font, bold, weekDate }) {
   })
 }
 
+function weekSplit({ page, w, h, font, bold, settings, weekDate }) {
+  const left = MARGIN
+  const right = w - MARGIN
+  const bottom = MARGIN
+  const { bg, fg } = bandColors(settings)
+
+  const drawDayTab = (name, offset, x, rowTop) => {
+    const label = dayTabLabel(name, weekDate, offset)
+    page.drawRectangle({
+      x,
+      y: rowTop - 12.5,
+      width: bold.widthOfTextAtSize(label, 7) + 8,
+      height: 12,
+      color: bg,
+    })
+    page.drawText(label, {
+      x: x + 4,
+      y: rowTop - 9,
+      size: 7,
+      font: bold,
+      color: fg,
+    })
+  }
+
+  // Six equal rows: Monday-Friday full width, then Saturday | Sunday sharing
+  // the bottom row, split down the middle.
+  const top = h - MARGIN
+  const rowH = (top - bottom) / 6
+
+  const names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+  for (let d = 0; d < 6; d++) {
+    const rowTop = top - d * rowH
+    page.drawLine({
+      start: { x: left, y: rowTop },
+      end: { x: right, y: rowTop },
+      thickness: 0.6,
+      color: LINE,
+    })
+    if (d < 5) {
+      drawDayTab(names[d], d + 1, left, rowTop)
+    } else {
+      const mid = (left + right) / 2
+      page.drawLine({
+        start: { x: mid, y: rowTop },
+        end: { x: mid, y: bottom },
+        thickness: 0.6,
+        color: LINE,
+      })
+      drawDayTab('Saturday', 6, left, rowTop)
+      drawDayTab('Sunday', 7, mid, rowTop)
+    }
+  }
+  page.drawLine({
+    start: { x: left, y: bottom },
+    end: { x: right, y: bottom },
+    thickness: 0.6,
+    color: LINE,
+  })
+}
+
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -433,13 +501,14 @@ function drawMonthPage({ page, font, bold, settings, monthTotal }, w, h, { check
     const cellX = MARGIN + c * cellW
     const cellTop = gridTop - headerH - r * cellH
     if (checkboxes) {
-      // Gray band across the cell top; checkbox left, date beside it.
+      // Band across the cell top; checkbox left, date beside it.
+      const { bg, fg } = bandColors(settings)
       page.drawRectangle({
         x: cellX,
         y: cellTop - 9.5,
         width: cellW,
         height: 9.5,
-        color: FAINT,
+        color: bg,
       })
       page.drawRectangle({
         x: cellX + 2,
@@ -447,14 +516,14 @@ function drawMonthPage({ page, font, bold, settings, monthTotal }, w, h, { check
         width: 5.5,
         height: 5.5,
         borderWidth: 0.6,
-        borderColor: LINE,
+        borderColor: settings?.highContrast ? fg : LINE,
       })
       page.drawText(String(d), {
         x: cellX + 11,
         y: cellTop - 8,
         size: 6,
         font,
-        color: INK,
+        color: fg,
       })
     } else {
       page.drawText(String(d), {
@@ -475,11 +544,11 @@ function fourWeeks(ctx) {
 function fourWeeksWide(ctx) {
   // Sideways: turn the booklet 90° clockwise to read it.
   ctx.page.pushOperators(pushGraphicsState(), concatTransformationMatrix(0, 1, -1, 0, ctx.w, 0))
-  drawFourWeeks(ctx, ctx.h, ctx.w)
+  drawFourWeeks(ctx, ctx.h, ctx.w, { wide: true })
   ctx.page.pushOperators(popGraphicsState())
 }
 
-function drawFourWeeks({ page, font, bold, settings, weekDate }, w, h) {
+function drawFourWeeks({ page, font, bold, settings, weekDate }, w, h, { wide = false } = {}) {
   const start = weekDate ?? (settings.weekStart != null ? new Date(settings.weekStart) : null)
   if (!start) return
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 27)
@@ -501,14 +570,27 @@ function drawFourWeeks({ page, font, bold, settings, weekDate }, w, h) {
   const headerH = 12
   const cellH = (gridTop - MARGIN - headerH) / rows
 
+  // Band behind the day-name header row.
+  const { bg, fg } = bandColors(settings)
+  page.drawRectangle({
+    x: MARGIN,
+    y: gridTop - headerH,
+    width: w - 2 * MARGIN,
+    height: headerH,
+    color: bg,
+  })
+
+  // The wide layout has room for full "Sun".."Sat" names; the narrow one
+  // sticks to single letters.
+  const dayFont = wide ? bold : font
   for (let c = 0; c < 7; c++) {
-    const label = WEEKDAYS[c]
+    const label = wide ? WEEKDAYS_SHORT[c] : WEEKDAYS[c]
     page.drawText(label, {
-      x: MARGIN + c * cellW + (cellW - font.widthOfTextAtSize(label, 6)) / 2,
+      x: MARGIN + c * cellW + (cellW - dayFont.widthOfTextAtSize(label, 6)) / 2,
       y: gridTop - 8,
       size: 6,
-      font,
-      color: INK,
+      font: dayFont,
+      color: fg,
     })
   }
 
@@ -537,23 +619,8 @@ function drawFourWeeks({ page, font, bold, settings, weekDate }, w, h) {
     const c = idx % 7
     const cellX = MARGIN + c * cellW
     const cellTop = gridTop - headerH - r * cellH
-    page.drawRectangle({
-      x: cellX,
-      y: cellTop - 9.5,
-      width: cellW,
-      height: 9.5,
-      color: FAINT,
-    })
-    page.drawRectangle({
-      x: cellX + 2,
-      y: cellTop - 7.5,
-      width: 5.5,
-      height: 5.5,
-      borderWidth: 0.6,
-      borderColor: LINE,
-    })
     page.drawText(String(date.getDate()), {
-      x: cellX + 11,
+      x: cellX + 2,
       y: cellTop - 8,
       size: 6,
       font,
@@ -708,6 +775,7 @@ export const TEMPLATES = {
   addressRoomy: { label: 'Address book (3/page)', draw: (ctx) => address(ctx, 19, 12) },
   conversions: { label: 'Conversions', draw: conversions },
   week: { label: 'Week (Sun-Sat)', draw: week, usesWeek: true },
+  weekSplit: { label: 'Week (classic planner)', draw: weekSplit, usesWeek: true },
   calendar: { label: 'Month calendar', draw: calendar, usesMonth: true },
   calendarCheck: { label: 'Month + checkboxes', draw: (ctx) => calendar(ctx, { checkboxes: true }), usesMonth: true },
   calendarWide: { label: 'Month (horizontal)', draw: calendarWide, usesMonth: true },

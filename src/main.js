@@ -7,8 +7,8 @@ const MONTHS = [
 ]
 
 const DEFAULT_PAGES = [
-  'week', 'address', 'fourWeeksWide', 'ledgerRoomy',
-  'ledgerRoomy', 'checklist', 'week', 'checklist',
+  'weekSplit', 'address', 'fourWeeksWide', 'ledgerRoomy',
+  'ledgerRoomy', 'lined', 'weekSplit', 'lined',
 ]
 
 // Page 1 leads with next week; pages 3 and 7 anchor to the current week.
@@ -30,6 +30,7 @@ const els = {
   year: document.getElementById('year'),
   showGuides: document.getElementById('showGuides'),
   showPageNumbers: document.getElementById('showPageNumbers'),
+  highContrast: document.getElementById('highContrast'),
   pages: document.getElementById('pages'),
   preview: document.getElementById('preview'),
   download: document.getElementById('download'),
@@ -98,6 +99,7 @@ function readSettings() {
     year: Number(els.year.value) || now.getFullYear(),
     showGuides: els.showGuides.checked,
     showPageNumbers: els.showPageNumbers.checked,
+    highContrast: els.highContrast.checked,
     pages: pageRows.map((r) => r.select.value),
     pageMonths: pageRows.map((r) => r.monthSelect.value),
     pageWeeks: pageRows.map((r) => r.weekSelect.value),
@@ -122,7 +124,7 @@ function scheduleUpdate() {
   timer = setTimeout(() => update().catch(console.error), 150)
 }
 
-for (const el of [els.paper, els.title, els.subtitle, els.month, els.year, els.showGuides, els.showPageNumbers]) {
+for (const el of [els.paper, els.title, els.subtitle, els.month, els.year, els.showGuides, els.showPageNumbers, els.highContrast]) {
   el.addEventListener('input', scheduleUpdate)
 }
 

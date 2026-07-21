@@ -1,4 +1,4 @@
-# Reelrod
+# ReelKnot
 
 A pocket booklet builder: compose an 8-page booklet from templates (cover,
 lined, dot grid, graph, checklist, storyboard, month calendar, blank), preview
@@ -24,8 +24,8 @@ marked slit along the middle, then fold into a booklet.
 ## Run with Docker
 
 ```sh
-docker build -t reelrod .
-docker run -d --name reelrod -p 8080:80 reelrod
+docker build -t reelknot .
+docker run -d --name reelknot -p 8080:80 reelknot
 ```
 
 Open http://localhost:8080
