@@ -7,8 +7,8 @@ const MONTHS = [
 ]
 
 const DEFAULT_PAGES = [
-  'weekSplit', 'address', 'fourWeeksWide', 'ledgerRoomy',
-  'ledgerRoomy', 'lined', 'weekSplit', 'lined',
+  'weekSplit', 'address', 'fourWeeksWide', 'ledger',
+  'ledger', 'lined', 'weekSplit', 'lined',
 ]
 
 // Page 1 leads with next week; pages 3 and 7 anchor to the current week.
