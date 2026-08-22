@@ -206,6 +206,176 @@ function ledger({ page, w, h, font, bold, settings }, rowH = 15) {
   page.pushOperators(popGraphicsState())
 }
 
+// Field-and-rule header used by the contact log: a small bold label with a
+// fill-in rule running to the end of the field. width 0 means "flex".
+function fillFields({ page, bold }, rows, { left, right, top, lineGap, size = 5.5, gap = 8 }) {
+  let y = top - lineGap
+  for (const row of rows) {
+    const flexCount = row.filter((f) => !f.width).length
+    const fixed = row.reduce((sum, f) => sum + (f.width ?? 0), 0)
+    const flexW = flexCount ? (right - left - fixed - gap * (row.length - 1)) / flexCount : 0
+    let x = left
+    for (const field of row) {
+      const fw = field.width || flexW
+      page.drawText(field.label, { x, y: y + 2, size, font: bold, color: INK })
+      page.drawLine({
+        start: { x: x + bold.widthOfTextAtSize(field.label, size) + 4, y },
+        end: { x: x + fw, y },
+        thickness: 0.5,
+        color: LINE,
+      })
+      x += fw + gap
+    }
+    y -= lineGap
+  }
+  return y + lineGap
+}
+
+// Shared grid for the contact-log tables: header band, row rules, column
+// rules. cols entries are { label, width }; the one with width 0 flexes.
+function logTable({ page, bold }, cols, { left, right, top, bottom, rowH, headerH = 13, size = 6, bg, fg }) {
+  const flex = cols.find((c) => !c.width)
+  if (flex) flex.width = right - left - cols.reduce((sum, c) => sum + c.width, 0)
+
+  const headerBase = top - headerH
+  page.drawRectangle({
+    x: left,
+    y: headerBase,
+    width: right - left,
+    height: headerH,
+    color: bg,
+  })
+  let cx = left
+  for (const col of cols) {
+    page.drawText(col.label, {
+      x: cx + 3,
+      y: headerBase + (headerH - size) / 2 + 1,
+      size,
+      font: bold,
+      color: fg,
+    })
+    cx += col.width
+  }
+
+  const rows = Math.floor((headerBase - bottom) / rowH)
+  const lastRow = headerBase - rows * rowH
+  for (let r = 0; r <= rows; r++) {
+    const y = headerBase - r * rowH
+    page.drawLine({
+      start: { x: left, y },
+      end: { x: right, y },
+      thickness: 0.4,
+      color: LINE,
+    })
+  }
+  cx = left
+  for (let c = 0; c <= cols.length; c++) {
+    page.drawLine({
+      start: { x: cx, y: top },
+      end: { x: cx, y: lastRow },
+      thickness: 0.4,
+      color: LINE,
+    })
+    cx += cols[c]?.width ?? 0
+  }
+  page.drawLine({
+    start: { x: left, y: top },
+    end: { x: right, y: top },
+    thickness: 0.4,
+    color: LINE,
+  })
+}
+
+function radiolog({ page, w, h, font, bold, settings }, { rowH = 14, bandColumn = true } = {}) {
+  const { bg, fg } = bandColors(settings)
+  // Drawn sideways like the ledger: turn the booklet 90 degrees clockwise to
+  // use the log. Landscape space is (h wide, w tall) mapped onto the cell.
+  page.pushOperators(pushGraphicsState(), concatTransformationMatrix(0, 1, -1, 0, w, 0))
+  const lw = h
+  const lh = w
+
+  const left = MARGIN
+  const right = lw - MARGIN
+  const top = lh - MARGIN
+
+  // Station block: what stays the same for the whole activation. When the
+  // table has no band column, band/mode/frequency are recorded once up here,
+  // so the block runs a line longer and tightens to keep the row count.
+  const fields = [
+    [{ label: 'Date', width: 84 }, { label: 'Grid', width: 74 }, { label: 'Park / SOTA' }],
+    [{ label: 'Location' }],
+    [{ label: 'Radio / Antenna' }],
+  ]
+  if (!bandColumn) {
+    fields.push([{ label: 'Band', width: 78 }, { label: 'Mode', width: 78 }, { label: 'Freq' }])
+  }
+  const lastRule = fillFields({ page, bold }, fields, {
+    left,
+    right,
+    top,
+    lineGap: bandColumn ? 12 : 11,
+  })
+
+  const cols = [
+    { label: 'Time', width: 34 },
+    { label: 'Callsign', width: 0 }, // flex - fills remaining space
+    ...(bandColumn ? [{ label: 'Band / Mode', width: 52 }] : []),
+    { label: 'RST S', width: 44 },
+    { label: 'RST R', width: 44 },
+  ]
+  logTable({ page, bold }, cols, {
+    left,
+    right,
+    top: lastRule - 5,
+    bottom: MARGIN,
+    rowH,
+    bg,
+    fg,
+  })
+  page.pushOperators(popGraphicsState())
+}
+
+// Rate log: same sideways turn, but a two-line station block and two narrow
+// tables side by side - fill the left one top to bottom, then the right.
+function radiologCompact({ page, w, h, font, bold, settings }, rowH = 12) {
+  const { bg, fg } = bandColors(settings)
+  page.pushOperators(pushGraphicsState(), concatTransformationMatrix(0, 1, -1, 0, w, 0))
+  const lw = h
+  const lh = w
+
+  const left = MARGIN
+  const right = lw - MARGIN
+  const top = lh - MARGIN
+
+  const lastRule = fillFields({ page, bold }, [
+    [{ label: 'Date', width: 78 }, { label: 'Grid', width: 66 }, { label: 'Park / SOTA' }],
+    [{ label: 'Band', width: 56 }, { label: 'Mode', width: 56 }, { label: 'Radio / Antenna' }],
+  ], { left, right, top, lineGap: 12 })
+
+  const gutter = 10
+  const halfW = (right - left - gutter) / 2
+  for (let i = 0; i < 2; i++) {
+    const x = left + i * (halfW + gutter)
+    logTable({ page, bold }, [
+      { label: 'Time', width: 26 },
+      { label: 'Call', width: 0 },
+      { label: 'Snt', width: 24 },
+      { label: 'Rcv', width: 24 },
+    ], {
+      left: x,
+      right: x + halfW,
+      top: lastRule - 5,
+      bottom: MARGIN,
+      rowH,
+      headerH: 11,
+      size: 5.5,
+      bg,
+      fg,
+    })
+  }
+  page.pushOperators(popGraphicsState())
+}
+
 function address({ page, w, h, font, bold }, lineGap, blockGap) {
   const left = MARGIN
   const right = w - MARGIN
@@ -760,6 +930,864 @@ function cover({ page, w, h, font, bold, settings }) {
   }
 }
 
+// --- Radio taiso ------------------------------------------------------------
+//
+// Stick figures are posed with joint angles instead of fixed coordinates.
+// Every angle is degrees from straight down, swinging away from the body:
+// 0 hangs at the side, 90 is horizontal, 180 points straight up. Limbs are
+// [upper, lower] pairs, arms and legs listed left side first. The figure is
+// built in a unit body 100 tall and scaled into whatever cell it lands in.
+const BODY = { headR: 7.5, torso: 31, upper: 16, fore: 15, thigh: 22, shin: 20 }
+
+function chain(page, x, y, side, segs, thickness, color) {
+  let last = 0
+  for (const [deg, len] of segs) {
+    const a = (deg * Math.PI) / 180
+    const nx = x + side * Math.sin(a) * len
+    const ny = y - Math.cos(a) * len
+    page.drawLine({ start: { x, y }, end: { x: nx, y: ny }, thickness, color })
+    x = nx
+    y = ny
+    last = deg
+  }
+  return { x, y, deg: last, side }
+}
+
+// Arc drawn as a short polyline with a two-stroke head at the finish, used for
+// the "circle this way" cues on the rotation movements.
+function arcArrow(page, cx, cy, r, a0, a1, thickness, color) {
+  const steps = 12
+  let prev = null
+  for (let i = 0; i <= steps; i++) {
+    const a = a0 + ((a1 - a0) * i) / steps
+    const pt = { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }
+    if (prev) page.drawLine({ start: prev, end: pt, thickness, color })
+    prev = pt
+  }
+  const tangent = a1 + (a1 > a0 ? 1 : -1) * (Math.PI / 2)
+  const back = tangent + Math.PI
+  for (const spread of [0.5, -0.5]) {
+    page.drawLine({
+      start: prev,
+      end: {
+        x: prev.x + r * 0.5 * Math.cos(back + spread),
+        y: prev.y + r * 0.5 * Math.sin(back + spread),
+      },
+      thickness,
+      color,
+    })
+  }
+}
+
+function upArrow(page, x, y, len, thickness, color) {
+  page.drawLine({ start: { x, y }, end: { x, y: y + len }, thickness, color })
+  for (const dx of [-1, 1]) {
+    page.drawLine({
+      start: { x, y: y + len },
+      end: { x: x + dx * len * 0.28, y: y + len * 0.72 },
+      thickness,
+      color,
+    })
+  }
+}
+
+// A dumbbell in the hand: a short bar square to the forearm with a plate on
+// each end, sized off the same unit body as the figure so it stays in scale.
+function dumbbell(page, hand, k, thickness, color) {
+  const a = (hand.deg * Math.PI) / 180
+  // The forearm runs along (side * sin a, -cos a); the bar lies square to it.
+  const bx = Math.cos(a)
+  const by = hand.side * Math.sin(a)
+  const half = 4 * k
+  page.drawLine({
+    start: { x: hand.x - bx * half, y: hand.y - by * half },
+    end: { x: hand.x + bx * half, y: hand.y + by * half },
+    thickness,
+    color,
+  })
+  for (const s of [-1, 1]) {
+    page.drawCircle({
+      x: hand.x + s * bx * half,
+      y: hand.y + s * by * half,
+      size: 2.8 * k,
+      color,
+    })
+  }
+}
+
+function stickFigure(page, cx, baseY, height, pose, color) {
+  const k = height / 100
+  const th = Math.max(0.7, height * 0.03)
+  const lean = ((pose.lean ?? 0) * Math.PI) / 180
+  const hipY = baseY + (pose.lift ?? 0) * k + (BODY.thigh + BODY.shin) * k
+  // A lying pose puts the whole body off to one side of the hips; shift moves
+  // the hips so the figure still sits in the middle of its frame.
+  const hipX = cx + (pose.shift ?? 0) * k
+
+  // Torso pivots about the hip; shoulders and head ride along with it.
+  const shX = hipX + Math.sin(lean) * BODY.torso * k
+  const shY = hipY + Math.cos(lean) * BODY.torso * k
+  page.drawLine({ start: { x: hipX, y: hipY }, end: { x: shX, y: shY }, thickness: th, color })
+
+  const headGap = (BODY.headR + 3) * k
+  page.drawCircle({
+    x: shX + Math.sin(lean) * headGap,
+    y: shY + Math.cos(lean) * headGap,
+    size: BODY.headR * k,
+    borderWidth: th,
+    borderColor: color,
+  })
+
+  // Shoulder and hip bars, square to the torso, so limbs don't sprout from a
+  // single point. Perpendicular to (sin, cos) is (cos, -sin).
+  const px = Math.cos(lean)
+  const py = -Math.sin(lean)
+  const shW = 6.5 * k
+  const hipW = 5 * k
+  const shoulders = [
+    { x: shX - px * shW, y: shY - py * shW },
+    { x: shX + px * shW, y: shY + py * shW },
+  ]
+  const hips = [
+    { x: hipX - px * hipW, y: hipY - py * hipW },
+    { x: hipX + px * hipW, y: hipY + py * hipW },
+  ]
+  page.drawLine({ start: shoulders[0], end: shoulders[1], thickness: th, color })
+  page.drawLine({ start: hips[0], end: hips[1], thickness: th, color })
+
+  const hands = []
+  for (const i of [0, 1]) {
+    const side = i === 0 ? -1 : 1
+    const [upper, fore] = pose.arm[i]
+    hands[i] = chain(page, shoulders[i].x, shoulders[i].y, side, [
+      [upper, BODY.upper * k],
+      [fore, BODY.fore * k],
+    ], th, color)
+    const [thigh, shin] = pose.leg[i]
+    chain(page, hips[i].x, hips[i].y, side, [
+      [thigh, BODY.thigh * k],
+      [shin, BODY.shin * k],
+    ], th, color)
+  }
+
+  // hold: true is one weight per hand, 'center' is a single weight gripped in
+  // both hands, and a [left, right] pair arms only the side that is working.
+  if (pose.hold === 'center') {
+    const bar = {
+      x: (hands[0].x + hands[1].x) / 2,
+      y: (hands[0].y + hands[1].y) / 2,
+      deg: 0,
+      side: 1,
+    }
+    dumbbell(page, bar, k, th, color)
+  } else if (pose.hold) {
+    for (const i of [0, 1]) {
+      if (pose.hold === true || pose.hold[i]) dumbbell(page, hands[i], k, th, color)
+    }
+  }
+
+  switch (pose.mark) {
+    case 'up':
+      for (const dx of [-1, 1]) {
+        upArrow(page, cx + dx * 34 * k, shY - 6 * k, 16 * k, th * 0.8, color)
+      }
+      break
+    case 'rotate':
+      arcArrow(page, cx + 30 * k, shY - 6 * k, 8 * k, 1.2, 1.2 - 4.8, th * 0.8, color)
+      break
+    case 'twist':
+      arcArrow(page, cx + 30 * k, hipY + 10 * k, 8 * k, 1.2, 1.2 - 4.8, th * 0.8, color)
+      break
+  }
+}
+
+// Radio taiso no. 1 in order: thirteen movements, roughly three minutes. Each
+// movement is a strip of three or four poses read left to right, so the shape
+// of the movement is visible without reading the caption.
+const TAISO = [
+  {
+    name: 'Stretch up',
+    text: 'Reach both arms overhead, rise on the toes, then lower.',
+    frames: [
+      { arm: [[6, 6], [6, 6]], leg: [[3, 3], [3, 3]] },
+      { arm: [[84, 66], [84, 66]], leg: [[3, 3], [3, 3]] },
+      { arm: [[150, 166], [150, 166]], leg: [[3, 3], [3, 3]], mark: 'up' },
+    ],
+  },
+  {
+    name: 'Arm swing + knee bend',
+    text: 'Swing the arms as the knees bend and straighten.',
+    frames: [
+      { arm: [[8, 8], [8, 8]], leg: [[4, 4], [4, 4]] },
+      { arm: [[50, 60], [50, 60]], leg: [[18, -4], [18, -4]] },
+      { arm: [[74, 58], [74, 58]], leg: [[32, -8], [32, -8]] },
+    ],
+  },
+  {
+    name: 'Arm circles',
+    text: 'Circle both arms forward, then circle them back.',
+    frames: [
+      { arm: [[25, 30], [25, 30]], leg: [[5, 5], [5, 5]] },
+      { arm: [[86, 74], [86, 74]], leg: [[5, 5], [5, 5]] },
+      { arm: [[150, 166], [150, 166]], leg: [[5, 5], [5, 5]] },
+      { arm: [[100, 120], [100, 120]], leg: [[5, 5], [5, 5]], mark: 'rotate' },
+    ],
+  },
+  {
+    name: 'Chest opener',
+    text: 'Open the arms wide and press the chest open.',
+    frames: [
+      { arm: [[30, 55], [30, 55]], leg: [[6, 6], [6, 6]] },
+      { arm: [[78, 56], [78, 56]], leg: [[6, 6], [6, 6]] },
+      { arm: [[96, 84], [96, 84]], leg: [[6, 6], [6, 6]] },
+    ],
+  },
+  {
+    name: 'Side bend',
+    text: 'One arm overhead, bend to the side; then the other.',
+    frames: [
+      { arm: [[150, 168], [10, 8]], leg: [[9, 9], [9, 9]] },
+      { lean: 24, arm: [[158, 172], [12, 10]], leg: [[9, 9], [9, 9]] },
+      { lean: -24, arm: [[12, 10], [158, 172]], leg: [[9, 9], [9, 9]] },
+    ],
+  },
+  {
+    name: 'Forward + back bend',
+    text: 'Bend forward toward the floor, then arch gently back.',
+    frames: [
+      { arm: [[8, 8], [8, 8]], leg: [[3, 3], [3, 3]] },
+      { lean: 62, arm: [[4, 2], [4, 2]], leg: [[2, 2], [2, 2]] },
+      { lean: -24, arm: [[150, 170], [150, 170]], leg: [[2, 2], [2, 2]] },
+    ],
+  },
+  {
+    name: 'Body twist',
+    text: 'Arms out; twist the upper body left and right.',
+    frames: [
+      { arm: [[88, 70], [88, 70]], leg: [[12, 12], [12, 12]] },
+      { arm: [[55, 40], [110, 120]], leg: [[12, 12], [12, 12]], mark: 'twist' },
+      { arm: [[110, 120], [55, 40]], leg: [[12, 12], [12, 12]] },
+    ],
+  },
+  {
+    name: 'Arms up and down',
+    text: 'Feet apart; stretch one arm up, one down. Alternate.',
+    frames: [
+      { arm: [[158, 170], [12, 8]], leg: [[17, 17], [17, 17]] },
+      { arm: [[86, 70], [86, 70]], leg: [[17, 17], [17, 17]] },
+      { arm: [[12, 8], [158, 170]], leg: [[17, 17], [17, 17]] },
+    ],
+  },
+  {
+    name: 'Diagonal bend',
+    text: 'Bend diagonally down, then open the chest upward.',
+    frames: [
+      { arm: [[150, 164], [150, 164]], leg: [[13, 13], [13, 13]] },
+      { lean: 30, arm: [[150, 162], [24, 16]], leg: [[13, 13], [13, 13]] },
+      { lean: -12, arm: [[140, 158], [140, 158]], leg: [[13, 13], [13, 13]] },
+    ],
+  },
+  {
+    name: 'Body circles',
+    text: 'Circle the upper body in a big loop, both ways.',
+    frames: [
+      { arm: [[152, 166], [152, 166]], leg: [[12, 12], [12, 12]] },
+      { lean: 28, arm: [[150, 164], [150, 164]], leg: [[12, 12], [12, 12]] },
+      { lean: 55, arm: [[6, 4], [6, 4]], leg: [[8, 8], [8, 8]] },
+      { lean: -28, arm: [[150, 164], [150, 164]], leg: [[12, 12], [12, 12]], mark: 'rotate' },
+    ],
+  },
+  {
+    name: 'Two-foot hops',
+    text: 'Hop lightly on both feet, together then apart.',
+    frames: [
+      { arm: [[18, 14], [18, 14]], leg: [[6, -6], [6, -6]] },
+      { lift: 12, arm: [[130, 140], [130, 140]], leg: [[26, 26], [26, 26]] },
+      { arm: [[18, 14], [18, 14]], leg: [[6, -6], [6, -6]] },
+    ],
+  },
+  {
+    name: 'Arm swing + knee bend',
+    text: 'Repeat no. 2: swing the arms, bend the knees.',
+    frames: [
+      { arm: [[8, 8], [8, 8]], leg: [[4, 4], [4, 4]] },
+      { arm: [[50, 60], [50, 60]], leg: [[18, -4], [18, -4]] },
+      { arm: [[74, 58], [74, 58]], leg: [[32, -8], [32, -8]] },
+    ],
+  },
+  {
+    name: 'Deep breathing',
+    text: 'Breathe in as the arms rise, out as they lower.',
+    frames: [
+      { arm: [[8, 8], [8, 8]], leg: [[4, 4], [4, 4]], mark: 'up' },
+      { arm: [[72, 58], [72, 58]], leg: [[4, 4], [4, 4]] },
+      { arm: [[128, 142], [128, 142]], leg: [[4, 4], [4, 4]] },
+    ],
+  },
+]
+
+// One sheet of an illustrated routine: a title block, then a grid of numbered
+// movements, each a strip of poses read left to right so the shape of the
+// movement is visible without reading the caption. The caller picks the grid,
+// so a long sequence can run 2-up while a short one takes the full width.
+// Title, subtitle, small print and the rule under them: shared by every
+// routine sheet so the pages stack with their headers in the same place.
+// Returns the y of the rule, which is the top of whatever grid follows.
+function sheetHeader({ page, w, h, font, bold, settings }, { title, sub, note }) {
+  const ink = settings?.highContrast ? BLACK : INK
+  const titleSize = 9
+  let y = h - MARGIN - titleSize
+  page.drawText(title, {
+    x: (w - bold.widthOfTextAtSize(title, titleSize)) / 2,
+    y,
+    size: titleSize,
+    font: bold,
+    color: ink,
+  })
+
+  y -= 9
+  page.drawText(sub, {
+    x: (w - font.widthOfTextAtSize(sub, 5.5)) / 2,
+    y,
+    size: 5.5,
+    font,
+    color: ink,
+  })
+
+  y -= 8
+  page.drawText(note, {
+    x: (w - font.widthOfTextAtSize(note, 4.5)) / 2,
+    y,
+    size: 4.5,
+    font,
+    color: settings?.highContrast ? ink : LINE,
+  })
+
+  y -= 5
+  page.drawLine({
+    start: { x: MARGIN, y },
+    end: { x: w - MARGIN, y },
+    thickness: 0.6,
+    color: LINE,
+  })
+  return y
+}
+
+function moveSheet(ctx, opts) {
+  const { page, w, font, bold, settings } = ctx
+  const { title, sub, note, moves, footer = [], cols = 2, rows = 4 } = opts
+  const numberFrom = opts.numberFrom ?? 1
+  const maxFigH = opts.maxFigH ?? 25
+  const { bg, fg } = bandColors(settings)
+  const ink = settings?.highContrast ? BLACK : INK
+  const left = MARGIN
+  const right = w - MARGIN
+
+  const y = sheetHeader(ctx, { title, sub, note })
+
+  const cellW = (right - left) / cols
+  const rowH = (y - MARGIN) / rows
+
+  moves.forEach((move, slot) => {
+    const cellX = left + (slot % cols) * cellW
+    const cellTop = y - Math.floor(slot / cols) * rowH
+
+    // Numbered badge in the corner, figure centred under it.
+    const badge = 4.8
+    page.drawCircle({ x: cellX + badge, y: cellTop - badge - 1, size: badge, color: bg })
+    const num = String(numberFrom + slot)
+    page.drawText(num, {
+      x: cellX + badge - bold.widthOfTextAtSize(num, 4.5) / 2,
+      y: cellTop - badge - 2.6,
+      size: 4.5,
+      font: bold,
+      color: fg,
+    })
+
+    // Sets and reps ride in the opposite corner, which the figures leave free.
+    if (move.reps) {
+      page.drawText(move.reps, {
+        x: cellX + cellW - 3 - bold.widthOfTextAtSize(move.reps, 5),
+        y: cellTop - badge - 2.6,
+        size: 5,
+        font: bold,
+        color: ink,
+      })
+    }
+
+    // The frames share one ground line, which is what makes the hop read as
+    // leaving the floor and keeps the leaning poses from looking like falls.
+    const baseY = cellTop - rowH + 22
+    const stripX = cellX + 3
+    const stripW = cellW - 6
+    page.drawLine({
+      start: { x: stripX, y: baseY },
+      end: { x: stripX + stripW, y: baseY },
+      thickness: 0.4,
+      color: settings?.highContrast ? LINE : FAINT,
+    })
+    const frameW = stripW / move.frames.length
+    const figH = Math.min(maxFigH, frameW * 1.2)
+    move.frames.forEach((pose, f) => {
+      stickFigure(page, stripX + (f + 0.5) * frameW, baseY, figH, pose, ink)
+    })
+
+    const nameSize = 5
+    page.drawText(move.name, {
+      x: cellX + (cellW - bold.widthOfTextAtSize(move.name, nameSize)) / 2,
+      y: cellTop - rowH + 16,
+      size: nameSize,
+      font: bold,
+      color: ink,
+    })
+
+    const textSize = 4.3
+    let ty = cellTop - rowH + 9
+    for (const line of wrapText(move.text, font, textSize, cellW - 8).slice(0, 2)) {
+      page.drawText(line, {
+        x: cellX + (cellW - font.widthOfTextAtSize(line, textSize)) / 2,
+        y: ty,
+        size: textSize,
+        font,
+        color: ink,
+      })
+      ty -= 5
+    }
+  })
+
+  // Whatever the last row leaves empty carries the closing note.
+  const empty = rows * cols - moves.length
+  if (footer.length && empty >= cols) {
+    let ny = y - rows * rowH + rowH / 2 + 4
+    for (const line of footer) {
+      page.drawText(line, {
+        x: (w - font.widthOfTextAtSize(line, 4.8)) / 2,
+        y: ny,
+        size: 4.8,
+        font,
+        color: ink,
+      })
+      ny -= 7
+    }
+  }
+}
+
+// Half the taiso sequence per page. Both pages use the same four-row grid so
+// the cells line up when the two pages sit side by side in the booklet.
+function taiso(ctx, from, to) {
+  moveSheet(ctx, {
+    title: 'Radio Taiso No. 1',
+    sub: `Movements ${from + 1} - ${to}`,
+    note: 'Japanese radio calisthenics - whole set about 3 minutes.',
+    moves: TAISO.slice(from, to),
+    numberFrom: from + 1,
+    footer: [
+      'Keep the pace steady and breathe through the set.',
+      'Finish with no. 13, then stand quietly for a moment.',
+    ],
+  })
+}
+
+// --- Dumbbell workout -------------------------------------------------------
+//
+// Same posing system as the taiso pages, plus a weight in the hand. The view
+// is front-on, so a movement that happens front-to-back (a row, a kickback,
+// a lunge) is staged as an in-plane silhouette: the frames still read as the
+// start, middle and end of the rep, which is what the page is for.
+// Lying on the back, head to the right: the legs mirror onto the same side as
+// the torso, and the hips slide left so the body centres in the frame.
+const SUPINE = {
+  lean: 90,
+  lift: -40.8,
+  shift: -10,
+  leg: [[-230, 40], [230, -40]],
+}
+
+const ARMS = [
+  {
+    name: 'Dumbbell curl',
+    reps: '3 x 10',
+    text: 'Elbows pinned to the ribs; curl up, lower slowly.',
+    frames: [
+      { hold: true, arm: [[20, 20], [20, 20]], leg: [[5, 5], [5, 5]] },
+      { hold: true, arm: [[20, 76], [20, 76]], leg: [[5, 5], [5, 5]] },
+      { hold: true, arm: [[20, 128], [20, 128]], leg: [[5, 5], [5, 5]] },
+    ],
+  },
+  {
+    name: 'Overhead triceps extension',
+    reps: '3 x 10',
+    text: 'One dumbbell in both hands; only the elbows move.',
+    frames: [
+      { hold: 'center', arm: [[172, 178], [172, 178]], leg: [[5, 5], [5, 5]] },
+      { hold: 'center', arm: [[172, 148], [172, 148]], leg: [[5, 5], [5, 5]] },
+      { hold: 'center', arm: [[172, 124], [172, 124]], leg: [[5, 5], [5, 5]] },
+    ],
+  },
+  {
+    name: 'Hammer curl',
+    reps: '3 x 12',
+    text: 'Palms facing in. Alternate arms, no swinging.',
+    frames: [
+      { hold: true, arm: [[20, 20], [20, 20]], leg: [[5, 5], [5, 5]] },
+      { hold: true, arm: [[20, 128], [20, 20]], leg: [[5, 5], [5, 5]] },
+      { hold: true, arm: [[20, 20], [20, 128]], leg: [[5, 5], [5, 5]] },
+    ],
+  },
+  {
+    name: 'Triceps kickback',
+    reps: '3 x 12',
+    text: 'Hinge forward, elbows high, straighten the arms back.',
+    frames: [
+      { hold: true, lean: 52, arm: [[30, 98], [30, 98]], leg: [[10, -6], [10, -6]] },
+      { hold: true, lean: 52, arm: [[30, 62], [30, 62]], leg: [[10, -6], [10, -6]] },
+      { hold: true, lean: 52, arm: [[30, 30], [30, 30]], leg: [[10, -6], [10, -6]] },
+    ],
+  },
+]
+
+const FULL_BODY = [
+  {
+    name: 'Goblet squat',
+    reps: '3 x 10',
+    text: 'Weight at the chest; sit down between the heels.',
+    frames: [
+      { hold: 'center', arm: [[18, 126], [18, 126]], leg: [[6, 6], [6, 6]] },
+      { hold: 'center', arm: [[18, 126], [18, 126]], leg: [[24, -6], [24, -6]] },
+      { hold: 'center', arm: [[18, 126], [18, 126]], leg: [[42, -14], [42, -14]] },
+    ],
+  },
+  {
+    name: 'Floor press',
+    reps: '3 x 10',
+    text: 'On the back, knees up; press straight over the chest.',
+    frames: [
+      { hold: true, ...SUPINE, arm: [[-200, -20], [200, 20]] },
+      { hold: true, ...SUPINE, arm: [[-186, -172], [186, 172]] },
+      { hold: true, ...SUPINE, arm: [[-180, -180], [180, 180]] },
+    ],
+  },
+  {
+    name: 'Romanian deadlift',
+    reps: '3 x 10',
+    text: 'Soft knees; push the hips back, weights close in.',
+    frames: [
+      { hold: true, arm: [[6, 6], [6, 6]], leg: [[4, 4], [4, 4]] },
+      { hold: true, lean: 34, arm: [[6, 6], [6, 6]], leg: [[3, 3], [3, 3]] },
+      { hold: true, lean: 66, arm: [[4, 4], [4, 4]], leg: [[2, 2], [2, 2]] },
+    ],
+  },
+  {
+    name: 'Bent-over row',
+    reps: '3 x 10',
+    text: 'Flat back; pull the weights to the ribs, then lower.',
+    frames: [
+      { hold: true, lean: 58, arm: [[8, 8], [8, 8]], leg: [[10, -6], [10, -6]] },
+      { hold: true, lean: 58, arm: [[124, 12], [124, 12]], leg: [[10, -6], [10, -6]] },
+      { hold: true, lean: 58, arm: [[148, 6], [148, 6]], leg: [[10, -6], [10, -6]] },
+    ],
+  },
+  {
+    name: 'Overhead press',
+    reps: '3 x 10',
+    text: 'From the shoulders, press up without arching back.',
+    frames: [
+      { hold: true, arm: [[88, 168], [88, 168]], leg: [[5, 5], [5, 5]] },
+      { hold: true, arm: [[126, 172], [126, 172]], leg: [[5, 5], [5, 5]] },
+      { hold: true, arm: [[170, 176], [170, 176]], leg: [[5, 5], [5, 5]], mark: 'up' },
+    ],
+  },
+  {
+    name: 'Reverse lunge',
+    reps: '2 x 10',
+    text: 'Step back, drop the rear knee, drive back up.',
+    frames: [
+      { hold: true, arm: [[18, 18], [18, 18]], leg: [[5, 5], [5, 5]] },
+      { hold: true, arm: [[18, 18], [18, 18]], leg: [[16, -14], [-26, -6]] },
+      { hold: true, arm: [[18, 18], [18, 18]], leg: [[30, -30], [-38, 6]] },
+    ],
+  },
+  {
+    name: 'Hammer curl',
+    reps: '2 x 12',
+    text: 'Palms facing in. Alternate arms, no swinging.',
+    frames: [
+      { hold: true, arm: [[20, 20], [20, 20]], leg: [[5, 5], [5, 5]] },
+      { hold: true, arm: [[20, 128], [20, 20]], leg: [[5, 5], [5, 5]] },
+      { hold: true, arm: [[20, 20], [20, 128]], leg: [[5, 5], [5, 5]] },
+    ],
+  },
+  {
+    name: 'Farmer carry',
+    reps: '2 x 40s',
+    text: 'Heavy in both hands; walk tall, ribs down, no lean.',
+    frames: [
+      { hold: true, arm: [[18, 18], [18, 18]], leg: [[14, -10], [-10, 4]] },
+      { hold: true, arm: [[18, 18], [18, 18]], leg: [[4, 4], [4, 4]] },
+      { hold: true, arm: [[18, 18], [18, 18]], leg: [[-10, 4], [14, -10]] },
+    ],
+  },
+]
+
+function dumbbellArms(ctx) {
+  moveSheet(ctx, {
+    title: 'Dumbbell Arms',
+    sub: 'Four movements - about 20 minutes',
+    note: 'Rest 60 seconds between sets. Last two reps should be hard.',
+    moves: ARMS,
+    cols: 1,
+    maxFigH: 30,
+  })
+}
+
+function dumbbellFull(ctx, from, to) {
+  moveSheet(ctx, {
+    title: 'Dumbbell Full Body',
+    sub: `Movements ${from + 1} - ${to}`,
+    note: 'One session: squat, hinge, push, pull, lunge, carry.',
+    moves: FULL_BODY.slice(from, to),
+    numberFrom: from + 1,
+    footer: [
+      'Rest 90 seconds on the big lifts, 60 on the rest.',
+      'Hit the top of every rep range, then add weight.',
+    ],
+  })
+}
+
+// --- Bodyweight legs --------------------------------------------------------
+//
+// Same posing system again, with nothing in the hands. Bending the legs would
+// leave the feet hanging over the ground line, so each frame carries a lift
+// that drops the hips by exactly what the bent legs lose in height - the feet
+// stay planted and the squat reads as a squat.
+const LEGS = [
+  {
+    name: 'Bodyweight squat',
+    reps: '3 x 15',
+    text: 'Feet shoulder width; sit down, drive up through the heels.',
+    frames: [
+      { arm: [[12, 12], [12, 12]], leg: [[5, 5], [5, 5]] },
+      { lift: -2, lean: 10, arm: [[22, 48], [22, 48]], leg: [[24, -6], [24, -6]] },
+      { lift: -6.2, lean: 18, arm: [[30, 72], [30, 72]], leg: [[42, -14], [42, -14]] },
+    ],
+  },
+  {
+    name: 'Side leg raise',
+    reps: '3 x 12 ea',
+    text: 'Stand tall; lift one leg out to the side. Both sides.',
+    frames: [
+      { arm: [[16, 14], [16, 14]], leg: [[4, 4], [4, 4]] },
+      { arm: [[46, 40], [46, 40]], leg: [[38, 40], [4, 4]] },
+      { arm: [[62, 56], [62, 56]], leg: [[66, 70], [4, 4]] },
+    ],
+  },
+  {
+    name: 'Heel raise',
+    reps: '3 x 20',
+    text: 'Rise onto the toes, pause at the top, lower slowly.',
+    frames: [
+      { arm: [[10, 10], [10, 10]], leg: [[3, 3], [3, 3]] },
+      { lift: 4, arm: [[12, 10], [12, 10]], leg: [[2, 2], [2, 2]] },
+      { lift: 8, arm: [[12, 10], [12, 10]], leg: [[1, 1], [1, 1]], mark: 'up' },
+    ],
+  },
+]
+
+function legs(ctx) {
+  moveSheet(ctx, {
+    title: 'Bodyweight Legs',
+    sub: 'Three movements - about 12 minutes',
+    note: 'No weights. Slow on the way down, strong on the way up.',
+    moves: LEGS,
+    cols: 1,
+    maxFigH: 30,
+    footer: [
+      'Rest 60 seconds between sets.',
+      'Add reps before you add weight.',
+    ],
+  })
+}
+
+// --- Standing stretches -----------------------------------------------------
+//
+// A stretch is one shape held, not a rep, so these don't get the three-frame
+// strip the workout sheets use: each stretch is a card with the hold time in
+// the corner and two figures sharing a floor line. A one-sided stretch shows
+// the same shape on each side (`both`), a two-sided one shows the easy version
+// next to the full one, so both figures are a pose you actually hold.
+// Everything is done from standing - no mat, no wall, no floor.
+
+// The same shape on the other side: the figure's sides are the two slots of
+// the limb pairs, so mirroring is a swap, plus a flip of anything that leans.
+function mirrorPose(pose) {
+  return {
+    ...pose,
+    lean: -(pose.lean ?? 0),
+    shift: -(pose.shift ?? 0),
+    arm: [pose.arm[1], pose.arm[0]],
+    leg: [pose.leg[1], pose.leg[0]],
+  }
+}
+
+const STRETCHES = [
+  {
+    name: 'Overhead reach',
+    hold: '20s',
+    text: 'Reach tall, palms up.',
+    frames: [
+      { arm: [[92, 104], [92, 104]], leg: [[3, 3], [3, 3]] },
+      { arm: [[146, 162], [146, 162]], leg: [[3, 3], [3, 3]] },
+    ],
+  },
+  {
+    name: 'Side bend',
+    hold: '20s ea',
+    text: 'Lean over, hips still.',
+    both: true,
+    pose: { lean: 26, arm: [[148, 166], [14, 10]], leg: [[9, 9], [9, 9]] },
+  },
+  {
+    name: 'Chest opener',
+    hold: '20s',
+    text: 'Arms wide and back.',
+    frames: [
+      { arm: [[86, 92], [86, 92]], leg: [[8, 8], [8, 8]] },
+      { arm: [[104, 120], [104, 120]], leg: [[8, 8], [8, 8]] },
+    ],
+  },
+  {
+    name: 'Cross-body shoulder',
+    hold: '20s ea',
+    text: 'Arm across, hug it in.',
+    both: true,
+    pose: { arm: [[88, -88], [42, -72]], leg: [[5, 5], [5, 5]] },
+  },
+  {
+    name: 'Overhead triceps',
+    hold: '20s ea',
+    text: 'Elbow up, press it back.',
+    both: true,
+    pose: { arm: [[150, -34], [14, 10]], leg: [[5, 5], [5, 5]] },
+  },
+  {
+    name: 'Standing quad',
+    hold: '30s ea',
+    text: 'Heel to the hip, knees together.',
+    both: true,
+    pose: { arm: [[40, 44], [16, 76]], leg: [[5, 5], [-14, 160]] },
+  },
+  {
+    name: 'Forward fold',
+    hold: '30s',
+    text: 'Soft knees, let the head hang.',
+    frames: [
+      { lean: 34, arm: [[8, 6], [8, 6]], leg: [[3, 3], [3, 3]] },
+      { lean: 66, arm: [[6, 4], [6, 4]], leg: [[3, 3], [3, 3]] },
+    ],
+  },
+  {
+    name: 'Calf stretch',
+    hold: '30s ea',
+    text: 'Back leg straight, heel down.',
+    both: true,
+    pose: { lean: 30, arm: [[74, 80], [74, 80]], leg: [[26, -8], [-24, -24]] },
+  },
+]
+
+// Card grid: one stretch per cell, read across then down. Same header and
+// margins as the workout sheets, so a stretch page sits next to them cleanly.
+function stretchSheet(ctx, opts) {
+  const { page, w, font, bold, settings } = ctx
+  const { title, sub, note, poses, cols = 2, rows = 4 } = opts
+  const { bg, fg } = bandColors(settings)
+  const ink = settings?.highContrast ? BLACK : INK
+  const left = MARGIN
+  const right = w - MARGIN
+
+  const y = sheetHeader(ctx, { title, sub, note })
+
+  const cellW = (right - left) / cols
+  const rowH = (y - MARGIN) / rows
+  const pad = 3
+
+  poses.forEach((s, slot) => {
+    const cellX = left + (slot % cols) * cellW
+    const cellTop = y - Math.floor(slot / cols) * rowH
+    page.drawRectangle({
+      x: cellX + pad,
+      y: cellTop - rowH + pad,
+      width: cellW - 2 * pad,
+      height: rowH - 2 * pad,
+      borderWidth: 0.5,
+      borderColor: settings?.highContrast ? LINE : FAINT,
+    })
+
+    // Hold time in a filled chip, top right, where the figures never reach.
+    const holdSize = 4.5
+    const chipW = bold.widthOfTextAtSize(s.hold, holdSize) + 5
+    page.drawRectangle({
+      x: cellX + cellW - pad - 2 - chipW,
+      y: cellTop - pad - 8,
+      width: chipW,
+      height: 7,
+      color: bg,
+    })
+    page.drawText(s.hold, {
+      x: cellX + cellW - pad - 2 - chipW + 2.5,
+      y: cellTop - pad - 6.2,
+      size: holdSize,
+      font: bold,
+      color: fg,
+    })
+
+    // Mirror first, so a two-sided pair leans away from itself rather than
+    // the two figures folding into each other in the middle of the card.
+    const frames = s.both ? [mirrorPose(s.pose), s.pose] : s.frames
+    const baseY = cellTop - rowH + 16
+    const stripX = cellX + pad + 2
+    const stripW = cellW - 2 * pad - 4
+    page.drawLine({
+      start: { x: stripX, y: baseY },
+      end: { x: stripX + stripW, y: baseY },
+      thickness: 0.4,
+      color: settings?.highContrast ? LINE : FAINT,
+    })
+    const frameW = stripW / frames.length
+    const figH = Math.min(30, rowH - 26, frameW * 0.85)
+    frames.forEach((pose, f) => {
+      stickFigure(page, stripX + (f + 0.5) * frameW, baseY, figH, pose, ink)
+    })
+
+    const nameSize = 4.8
+    page.drawText(s.name, {
+      x: cellX + (cellW - bold.widthOfTextAtSize(s.name, nameSize)) / 2,
+      y: cellTop - rowH + 9.5,
+      size: nameSize,
+      font: bold,
+      color: ink,
+    })
+
+    const textSize = 4.1
+    const line = wrapText(s.text, font, textSize, cellW - 2 * pad - 4)[0]
+    page.drawText(line, {
+      x: cellX + (cellW - font.widthOfTextAtSize(line, textSize)) / 2,
+      y: cellTop - rowH + 4.5,
+      size: textSize,
+      font,
+      color: ink,
+    })
+  })
+}
+
+function stretches(ctx) {
+  stretchSheet(ctx, {
+    title: 'Standing Stretches',
+    sub: 'Eight holds - about 6 minutes',
+    note: 'All from standing. Breathe out into each hold; never bounce.',
+    poses: STRETCHES,
+  })
+}
+
 export const TEMPLATES = {
   cover: { label: 'Cover', draw: cover },
   blank: { label: 'Blank', draw: blank },
@@ -771,9 +1799,21 @@ export const TEMPLATES = {
   storyboard: { label: 'Storyboard', draw: storyboard },
   ledger: { label: 'Transaction log', draw: ledger },
   ledgerRoomy: { label: 'Transaction log (roomy)', draw: (ctx) => ledger(ctx, 20) },
+  radiolog: { label: 'Radio contact log', draw: radiolog },
+  radiologRoomy: { label: 'Radio contact log (roomy)', draw: (ctx) => radiolog(ctx, { rowH: 19 }) },
+  radiologBand: { label: 'Radio contact log (one band)', draw: (ctx) => radiolog(ctx, { bandColumn: false, rowH: 13 }) },
+  radiologCompact: { label: 'Radio contact log (2-up)', draw: radiologCompact },
   address: { label: 'Address book (4/page)', draw: (ctx) => address(ctx, 15, 8) },
   addressRoomy: { label: 'Address book (3/page)', draw: (ctx) => address(ctx, 19, 12) },
   conversions: { label: 'Conversions', draw: conversions },
+  taisoA: { label: 'Radio taiso (moves 1-7)', draw: (ctx) => taiso(ctx, 0, 7) },
+  taisoB: { label: 'Radio taiso (moves 8-13)', draw: (ctx) => taiso(ctx, 7, 13) },
+  dumbbellArms: { label: 'Dumbbell arms', draw: dumbbellArms },
+  dumbbellFull: { label: 'Dumbbell full body', draw: (ctx) => dumbbellFull(ctx, 0, 8) },
+  dumbbellFullA: { label: 'Dumbbell full body (moves 1-4)', draw: (ctx) => dumbbellFull(ctx, 0, 4) },
+  dumbbellFullB: { label: 'Dumbbell full body (moves 5-8)', draw: (ctx) => dumbbellFull(ctx, 4, 8) },
+  legs: { label: 'Bodyweight legs', draw: legs },
+  stretches: { label: 'Standing stretches', draw: stretches },
   week: { label: 'Week (Sun-Sat)', draw: week, usesWeek: true },
   weekSplit: { label: 'Week (classic planner)', draw: weekSplit, usesWeek: true },
   calendar: { label: 'Month calendar', draw: calendar, usesMonth: true },
