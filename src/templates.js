@@ -1015,9 +1015,36 @@ function dumbbell(page, hand, k, thickness, color) {
   }
 }
 
+// A chair, step or wall, drawn from the same unit body as the figure so the
+// movements that need furniture stay in scale with it. x is measured from the
+// figure's centre line and everything stands on the ground line.
+function furniture(page, cx, baseY, k, spec, thickness, color) {
+  const { kind, x = 0, w = 26, h = 20 } = spec
+  if (kind === 'wall') {
+    page.drawLine({
+      start: { x: cx + x * k, y: baseY },
+      end: { x: cx + x * k, y: baseY + h * k },
+      thickness,
+      color,
+    })
+    return
+  }
+  page.drawRectangle({
+    x: cx + x * k,
+    y: baseY,
+    width: w * k,
+    height: h * k,
+    borderWidth: thickness,
+    borderColor: color,
+  })
+}
+
 function stickFigure(page, cx, baseY, height, pose, color) {
   const k = height / 100
   const th = Math.max(0.7, height * 0.03)
+  // Furniture goes down first, so the figure's limbs draw over the seat edge
+  // rather than disappearing behind it.
+  if (pose.prop) furniture(page, cx, baseY, k, pose.prop, th * 0.8, color)
   const lean = ((pose.lean ?? 0) * Math.PI) / 180
   const hipY = baseY + (pose.lift ?? 0) * k + (BODY.thigh + BODY.shin) * k
   // A lying pose puts the whole body off to one side of the hips; shift moves
@@ -1326,8 +1353,11 @@ function moveSheet(ctx, opts) {
       thickness: 0.4,
       color: settings?.highContrast ? LINE : FAINT,
     })
+    // A movement done on the floor stands maybe a third as tall as a standing
+    // one, so it can be drawn bigger before it runs out of cell: `figH` lets
+    // such a movement raise its own cap without changing the rest of the page.
     const frameW = stripW / move.frames.length
-    const figH = Math.min(maxFigH, frameW * 1.2)
+    const figH = Math.min(move.figH ?? maxFigH, frameW * 1.2)
     move.frames.forEach((pose, f) => {
       stickFigure(page, stripX + (f + 0.5) * frameW, baseY, figH, pose, ink)
     })
@@ -1788,6 +1818,179 @@ function stretches(ctx) {
   })
 }
 
+// --- Seven-minute workout ---------------------------------------------------
+//
+// The ACSM high-intensity circuit: twelve bodyweight movements, 30 seconds of
+// work and 10 to change over, ordered so upper body, lower body and core take
+// turns and one group rests while the next works. Four of them need a chair or
+// a wall, which is drawn from the same unit body as the figure. The floor
+// movements are staged the way the dumbbell floor press is - the body lies
+// along the ground line with the head to the right - so a push-up reads as a
+// push-up rather than as a figure seen from above.
+const CHAIR = { kind: 'box', x: 8, w: 26, h: 20 }
+const CHAIR_BEHIND = { kind: 'box', x: 12, w: 26, h: 20 }
+const WALL = { kind: 'wall', x: 12, h: 92 }
+
+// Both sides of an alternating movement: posed once, mirrored for the return.
+const HIGH_KNEE = { lift: 3, arm: [[30, 100], [-20, -30]], leg: [[2, 2], [72, 16]] }
+const SIDE_PLANK = {
+  lean: 78,
+  lift: -29,
+  shift: -4,
+  arm: [[180, 180], [0, 90]],
+  leg: [[76, 76], [-76, -76]],
+}
+
+// A push-up is one straight line from the toes to the shoulders, so the lean
+// and the leg angle are the same angle: at the top the line clears the floor
+// by an arm's length, at the bottom by a bent arm's.
+const PUSHUP_TOP = {
+  lean: 65,
+  lift: -24,
+  shift: -4,
+  arm: [[0, 0], [0, 0]],
+  leg: [[65, 65], [-65, -65]],
+}
+
+const SEVEN = [
+  {
+    name: 'Jumping jacks',
+    reps: '30s',
+    text: 'Feet out and arms overhead; land soft, keep a rhythm.',
+    frames: [
+      { arm: [[10, 8], [10, 8]], leg: [[4, 4], [4, 4]] },
+      { lift: 7, arm: [[74, 84], [74, 84]], leg: [[18, 18], [18, 18]] },
+      { lift: 11, arm: [[150, 166], [150, 166]], leg: [[30, 30], [30, 30]] },
+    ],
+  },
+  {
+    name: 'Wall sit',
+    reps: '30s',
+    text: 'Back flat on the wall, thighs level, hold still.',
+    frames: [
+      { prop: WALL, arm: [[6, -6], [-6, 6]], leg: [[2, 0], [-2, 0]] },
+      { prop: WALL, lift: -9, arm: [[6, -6], [-6, 6]], leg: [[46, -24], [-46, 24]] },
+      { prop: WALL, lift: -22, arm: [[6, -6], [-6, 6]], leg: [[90, 0], [-90, 0]] },
+    ],
+  },
+  {
+    name: 'Push-up',
+    figH: 40,
+    reps: '30s',
+    text: 'Hands under the shoulders; body stays one straight line.',
+    frames: [
+      PUSHUP_TOP,
+      { lean: 74, lift: -30, shift: -4, arm: [[40, -55], [-40, 55]], leg: [[74, 74], [-74, -74]] },
+    ],
+  },
+  {
+    name: 'Abdominal crunch',
+    figH: 40,
+    reps: '30s',
+    text: 'Knees up; curl the shoulders off the floor, then lower.',
+    frames: [
+      { ...SUPINE, arm: [[118, 118], [-118, -118]] },
+      { ...SUPINE, lean: 62, arm: [[100, 100], [-100, -100]] },
+    ],
+  },
+  {
+    name: 'Step-up onto chair',
+    reps: '30s',
+    text: 'Whole foot on the seat; stand up tall, step back down.',
+    frames: [
+      { prop: CHAIR, arm: [[10, 10], [10, 10]], leg: [[3, 3], [3, 3]] },
+      { prop: CHAIR, lean: 8, shift: 3, arm: [[14, 14], [14, 14]], leg: [[3, 3], [80, -26]] },
+      { prop: CHAIR, lift: 20, shift: 20, arm: [[12, 12], [12, 12]], leg: [[3, 3], [3, 3]] },
+    ],
+  },
+  {
+    name: 'Squat',
+    reps: '30s',
+    text: 'Feet shoulder width; sit down, drive up through the heels.',
+    frames: LEGS[0].frames,
+  },
+  {
+    name: 'Triceps dip on chair',
+    figH: 38,
+    reps: '30s',
+    text: 'Hands on the edge behind you; elbows track straight back.',
+    frames: [
+      { prop: CHAIR_BEHIND, lift: -26, shift: 8, arm: [[-24, -24], [24, 24]], leg: [[68, 68], [-68, -68]] },
+      { prop: CHAIR_BEHIND, lift: -30, shift: 8, arm: [[-60, 7], [60, -7]], leg: [[78, 66], [-78, -66]] },
+    ],
+  },
+  {
+    name: 'Plank',
+    figH: 36,
+    reps: '30s',
+    text: 'Elbows under the shoulders. Knees down if the hips sag.',
+    frames: [
+      { lean: 86, lift: -25, shift: -4, arm: [[0, -90], [0, 90]], leg: [[51, 90], [-51, -90]] },
+      { lean: 75, lift: -31, shift: -4, arm: [[0, -90], [0, 90]], leg: [[79, 79], [-79, -79]] },
+    ],
+  },
+  {
+    name: 'High knees',
+    reps: '30s',
+    text: 'Run on the spot; drive each knee up to hip height.',
+    frames: [
+      HIGH_KNEE,
+      { lift: 6, arm: [[16, 20], [16, 20]], leg: [[8, 8], [8, 8]] },
+      mirrorPose(HIGH_KNEE),
+    ],
+  },
+  {
+    name: 'Lunge',
+    reps: '30s',
+    text: 'Step back, drop the rear knee, drive up. Alternate legs.',
+    frames: [
+      { arm: [[30, -32], [30, -32]], leg: [[5, 5], [5, 5]] },
+      { lift: -2, arm: [[32, -34], [32, -34]], leg: [[16, -14], [-26, -6]] },
+      { lift: -5, arm: [[34, -36], [34, -36]], leg: [[30, -30], [-38, 6]] },
+    ],
+  },
+  {
+    name: 'Push-up + rotation',
+    figH: 38,
+    reps: '30s',
+    text: 'Push up, then turn into a side plank, top arm to the ceiling.',
+    frames: [
+      PUSHUP_TOP,
+      { ...PUSHUP_TOP, arm: [[180, 180], [0, 0]] },
+    ],
+  },
+  {
+    name: 'Side plank',
+    figH: 36,
+    reps: '30s',
+    text: 'Hips up, body in a line. Half the time on each side.',
+    frames: [mirrorPose(SIDE_PLANK), SIDE_PLANK],
+  },
+]
+
+// Six movements a page, on the same four-row grid as the taiso pages, so the
+// two halves of the circuit line up when they sit side by side.
+function sevenMin(ctx, from, to) {
+  moveSheet(ctx, {
+    title: 'Seven-Minute Workout',
+    sub: `Movements ${from + 1} - ${to}`,
+    note: '30 seconds each, 10 to change over. Needs a chair and a wall.',
+    moves: SEVEN.slice(from, to),
+    numberFrom: from + 1,
+    maxFigH: 28,
+    footer:
+      from === 0
+        ? [
+            'Work hard enough that the last few seconds are a fight.',
+            'Movements 7 - 12 finish the round.',
+          ]
+        : [
+            'One round is seven minutes. Go again if you have more in you.',
+            'The order alternates upper body, lower body and core.',
+          ],
+  })
+}
+
 export const TEMPLATES = {
   cover: { label: 'Cover', draw: cover },
   blank: { label: 'Blank', draw: blank },
@@ -1813,6 +2016,8 @@ export const TEMPLATES = {
   dumbbellFullA: { label: 'Dumbbell full body (moves 1-4)', draw: (ctx) => dumbbellFull(ctx, 0, 4) },
   dumbbellFullB: { label: 'Dumbbell full body (moves 5-8)', draw: (ctx) => dumbbellFull(ctx, 4, 8) },
   legs: { label: 'Bodyweight legs', draw: legs },
+  sevenMinA: { label: 'Seven-minute workout (1-6)', draw: (ctx) => sevenMin(ctx, 0, 6) },
+  sevenMinB: { label: 'Seven-minute workout (7-12)', draw: (ctx) => sevenMin(ctx, 6, 12) },
   stretches: { label: 'Standing stretches', draw: stretches },
   week: { label: 'Week (Sun-Sat)', draw: week, usesWeek: true },
   weekSplit: { label: 'Week (classic planner)', draw: weekSplit, usesWeek: true },
