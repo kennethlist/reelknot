@@ -50,6 +50,14 @@ async function loadImage(name) {
     const res = await fetch(`/knot-images/${name}.jpg`)
     if (!res.ok) throw new Error(`missing image ${name}`)
     bytes = new Uint8Array(await res.arrayBuffer())
+    // A misdeployed site answers with the SPA's index.html (200, text/html);
+    // catch that here with a clear message instead of pdf-lib's "SOI not found".
+    if (bytes.length < 2 || bytes[0] !== 0xff || bytes[1] !== 0xd8) {
+      throw new Error(
+        `/knot-images/${name}.jpg is not a JPEG (got ${res.headers.get('content-type') || 'unknown'}); ` +
+          'the public/knot-images folder is missing from the deployed site',
+      )
+    }
   }
   imageBytes.set(name, bytes)
   return bytes
