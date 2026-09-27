@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ReelKnot — print maps</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <aside id="sidebar">
+      <header>
+        <h1>Print Maps</h1>
+        <p class="tagline">USGS US Topo sheets at true print scale.</p>
+        <p class="nav"><a href="/">&larr; Booklet builder</a></p>
+      </header>
+
+      <section>
+        <p class="hint">Click map cells to select US&nbsp;Topo sheets, then generate a
+        PDF. Topo tiles are downloaded from USGS only when you generate.</p>
+      </section>
+
+      <section>
+        <h2>Sheet</h2>
+        <div class="field-row">
+          <label for="scale">Scale</label>
+          <select id="scale">
+            <option value="10000">1:10,000</option>
+            <option value="24000" selected>1:24,000</option>
+            <option value="25000">1:25,000</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label for="paper">Paper</label>
+          <select id="paper">
+            <option value="letter">US Letter</option>
+            <option value="a4">A4</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label for="orientation">Orientation</label>
+          <select id="orientation">
+            <option value="portrait">Portrait</option>
+            <option value="landscape">Landscape</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label for="dpi">Quality</label>
+          <select id="dpi">
+            <option value="150">150 dpi — fastest</option>
+            <option value="200" selected>200 dpi — recommended</option>
+            <option value="300">300 dpi — sharpest, slower</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label for="colorMode">Color</label>
+          <select id="colorMode">
+            <option value="color">Color</option>
+            <option value="gray">Grayscale</option>
+            <option value="bw">B&amp;W — high contrast</option>
+          </select>
+        </div>
+        <p class="hint" id="bwHint" hidden>Boosts contrast and forces grid and labels to
+        black for black-and-white printers.</p>
+        <p class="hint warn" id="scaleHint" hidden>1:10,000 detail is limited by USGS
+        source resolution and will be upsampled.</p>
+      </section>
+
+      <section>
+        <h2>Grid lines</h2>
+        <label class="check"><input type="checkbox" id="gratOn" checked /> Lat/lon graticule</label>
+        <div class="subrow" data-for="gratOn">
+          <select id="gratStyle" title="Line style">
+            <option value="solid">Solid</option>
+            <option value="dashed">Dashed</option>
+            <option value="dotted" selected>Dotted</option>
+          </select>
+          <select id="gratOpacity" title="Opacity">
+            <option value="1">100%</option>
+            <option value="0.75" selected>75%</option>
+            <option value="0.5">50%</option>
+            <option value="0.25">25%</option>
+          </select>
+          <select id="gratWeight" title="Line weight">
+            <option value="hairline">Hairline</option>
+            <option value="thin" selected>Thin</option>
+            <option value="normal">Normal</option>
+            <option value="bold">Bold</option>
+          </select>
+        </div>
+        <label class="check"><input type="checkbox" id="utmOn" checked /> UTM grid (km)</label>
+        <div class="subrow" data-for="utmOn">
+          <select id="utmStyle" title="Line style">
+            <option value="solid">Solid</option>
+            <option value="dashed" selected>Dashed</option>
+            <option value="dotted">Dotted</option>
+          </select>
+          <select id="utmOpacity" title="Opacity">
+            <option value="1">100%</option>
+            <option value="0.75">75%</option>
+            <option value="0.5" selected>50%</option>
+            <option value="0.25">25%</option>
+          </select>
+          <select id="utmWeight" title="Line weight">
+            <option value="hairline">Hairline</option>
+            <option value="thin" selected>Thin</option>
+            <option value="normal">Normal</option>
+            <option value="bold">Bold</option>
+          </select>
+        </div>
+        <p class="hint">Style, opacity and weight for each grid. Edge labels go with their grid.</p>
+      </section>
+
+      <section>
+        <h2>Title</h2>
+        <div class="field-row">
+          <label for="title">Title</label>
+          <input type="text" id="title" maxlength="80" placeholder="Auto (USGS quad name)" />
+        </div>
+        <label class="check"><input type="checkbox" id="overview" checked disabled /> Index page
+          (multi-sheet)</label>
+        <p class="hint">A first page showing all selected sheets outlined on one map.</p>
+      </section>
+
+      <section>
+        <div class="stat"><span>Pages selected</span><strong id="count">0 / 100</strong></div>
+        <div class="btn-row">
+          <button id="generate" class="btn-primary" disabled>Generate PDF</button>
+          <button id="clear" class="btn-secondary" disabled>Clear</button>
+        </div>
+        <div id="progress" hidden>
+          <div class="progress-text"><span id="progressLabel">Rendering sheets…</span><span id="progressCount"></span></div>
+          <div class="progress"><div id="progressBar"></div></div>
+          <p class="hint">Each sheet downloads USGS tiles — large jobs take a while.</p>
+          <button id="cancel" class="btn-secondary">Cancel</button>
+        </div>
+        <p id="status" class="status" hidden></p>
+        <p id="tooMany" class="hint" hidden>Zoom in to select individual page areas.</p>
+      </section>
+
+      <footer>
+        <p>Map data: USGS US&nbsp;Topo via
+        <a href="https://www.usgs.gov/programs/national-geospatial-program/national-map"
+           target="_blank" rel="noreferrer">The National Map</a>. Each sheet's publication
+        year is printed on the PDF. Print at 100% scale.</p>
+      </footer>
+    </aside>
+
+    <main id="map-pane">
+      <div id="map"></div>
+      <div id="result" hidden>
+        <div class="result-bar">
+          <span id="resultInfo"></span>
+          <button id="resultDownload" class="btn-primary">Download PDF</button>
+          <button id="resultClose" class="btn-secondary">Back to map</button>
+        </div>
+        <iframe id="resultFrame" title="Map PDF preview"></iframe>
+      </div>
+    </main>
+
+    <script type="module" src="/src/maps/main.js"></script>
+  </body>
+</html>

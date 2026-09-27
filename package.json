@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "leaflet": "^1.9.4",
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {

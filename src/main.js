@@ -1,18 +1,44 @@
 import { generateBooklet, PAPER_SIZES } from './booklet.js'
-import { TEMPLATES } from './templates.js'
+import { TEMPLATES, GROUPS } from './templates.js'
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
 
-const DEFAULT_PAGES = [
-  'weekSplit', 'address', 'fourWeeksWide', 'ledger',
-  'ledger', 'lined', 'weekSplit', 'lined',
-]
-
-// Page 1 leads with next week; pages 3 and 7 anchor to the current week.
-const DEFAULT_PAGE_WEEKS = ['1', 'auto', '0', 'auto', 'auto', 'auto', '0', 'auto']
+// Presets fill all eight page slots (and the sheet toggles) in one go; the
+// pages can still be changed one at a time afterwards.
+const PRESETS = {
+  planner: {
+    label: 'Planner',
+    pages: ['weekSplit', 'address', 'fourWeeksWide', 'ledger', 'ledger', 'lined', 'weekSplit', 'lined'],
+    // Page 1 leads with next week; pages 3 and 7 anchor to the current week.
+    weeks: ['1', 'auto', '0', 'auto', 'auto', 'auto', '0', 'auto'],
+  },
+  reference: {
+    label: 'Reference',
+    pages: ['conversions', 'shopTable', 'tempTable', 'weights', 'speedTable', 'areaSheet', 'kitchenSheet', 'mathSheet'],
+    showRuler: true,
+  },
+  workout: {
+    label: 'Workout',
+    pages: ['sevenMinB', 'legs', 'stretches', 'taisoA', 'taisoB', 'dumbbellFullA', 'dumbbellFullB', 'sevenMinA'],
+  },
+  hamRadio: {
+    label: 'Ham radio',
+    pages: ['radioFreqs', 'phoneticsSheet', 'electronicsSheet', 'lined', 'lined', 'qcodeSheet', 'morseTree', 'electrical'],
+  },
+  hamLog: {
+    label: 'Ham radio log book',
+    pages: ['radiolog', 'radiolog', 'radiolog', 'bandPlan', 'phoneticsSheet', 'radiolog', 'radiolog', 'radiolog'],
+  },
+  knots: {
+    label: 'Knots',
+    pages: ['ropeKnots', 'ropeKnots2', 'cloveHitch', 'truckersHitch', 'tautLine', 'prusik', 'fishingKnots', 'fishingKnots2'],
+    showRuler: true,
+  },
+}
+const DEFAULT_PRESET = 'planner'
 
 const WEEK_CHOICES = [
   ['auto', 'Auto'],
@@ -23,6 +49,7 @@ const WEEK_CHOICES = [
 ]
 
 const els = {
+  preset: document.getElementById('preset'),
   paper: document.getElementById('paper'),
   title: document.getElementById('title'),
   subtitle: document.getElementById('subtitle'),
@@ -30,6 +57,7 @@ const els = {
   year: document.getElementById('year'),
   showGuides: document.getElementById('showGuides'),
   showPageNumbers: document.getElementById('showPageNumbers'),
+  showRuler: document.getElementById('showRuler'),
   highContrast: document.getElementById('highContrast'),
   pages: document.getElementById('pages'),
   preview: document.getElementById('preview'),
@@ -39,22 +67,30 @@ const els = {
 for (const [key, { label }] of Object.entries(PAPER_SIZES)) {
   els.paper.add(new Option(label, key))
 }
+for (const [key, { label }] of Object.entries(PRESETS)) {
+  els.preset.add(new Option(label, key))
+}
+els.preset.add(new Option('Custom', 'custom'))
 
 MONTHS.forEach((name, i) => els.month.add(new Option(name, i)))
 const now = new Date()
 els.month.value = now.getMonth()
 els.year.value = now.getFullYear()
 
-const pageRows = DEFAULT_PAGES.map((def, i) => {
+const pageRows = Array.from({ length: 8 }, (_, i) => {
   const row = document.createElement('div')
   row.className = 'field-row'
   const label = document.createElement('label')
   label.textContent = `Page ${i + 1}`
   const select = document.createElement('select')
-  for (const [key, tpl] of Object.entries(TEMPLATES)) {
-    select.add(new Option(tpl.label, key))
+  for (const group of GROUPS) {
+    const optgroup = document.createElement('optgroup')
+    optgroup.label = group
+    for (const [key, tpl] of Object.entries(TEMPLATES)) {
+      if (tpl.group === group) optgroup.append(new Option(tpl.label, key))
+    }
+    select.append(optgroup)
   }
-  select.value = def
   // Month picker, shown only for month-calendar templates. 'Auto' continues
   // from the previous calendar page on the sheet.
   const monthSelect = document.createElement('select')
@@ -70,7 +106,6 @@ const pageRows = DEFAULT_PAGES.map((def, i) => {
   for (const [value, text] of WEEK_CHOICES) {
     weekSelect.add(new Option(text, value))
   }
-  weekSelect.value = DEFAULT_PAGE_WEEKS[i]
   weekSelect.addEventListener('input', scheduleUpdate)
   const syncPickerVisibility = () => {
     monthSelect.style.display = TEMPLATES[select.value]?.usesMonth ? '' : 'none'
@@ -78,12 +113,31 @@ const pageRows = DEFAULT_PAGES.map((def, i) => {
   }
   select.addEventListener('input', () => {
     syncPickerVisibility()
+    els.preset.value = 'custom'
     scheduleUpdate()
   })
-  syncPickerVisibility()
   row.append(label, select, monthSelect, weekSelect)
   els.pages.append(row)
-  return { select, monthSelect, weekSelect }
+  return { select, monthSelect, weekSelect, syncPickerVisibility }
+})
+
+function applyPreset(key) {
+  const preset = PRESETS[key]
+  if (!preset) return
+  pageRows.forEach((r, i) => {
+    r.select.value = preset.pages[i]
+    r.monthSelect.value = preset.months?.[i] ?? 'auto'
+    r.weekSelect.value = preset.weeks?.[i] ?? 'auto'
+    r.syncPickerVisibility()
+  })
+  els.showRuler.checked = Boolean(preset.showRuler)
+}
+
+els.preset.value = DEFAULT_PRESET
+applyPreset(DEFAULT_PRESET)
+els.preset.addEventListener('input', () => {
+  applyPreset(els.preset.value)
+  scheduleUpdate()
 })
 
 function readSettings() {
@@ -99,6 +153,7 @@ function readSettings() {
     year: Number(els.year.value) || now.getFullYear(),
     showGuides: els.showGuides.checked,
     showPageNumbers: els.showPageNumbers.checked,
+    showRuler: els.showRuler.checked,
     highContrast: els.highContrast.checked,
     pages: pageRows.map((r) => r.select.value),
     pageMonths: pageRows.map((r) => r.monthSelect.value),
@@ -124,7 +179,7 @@ function scheduleUpdate() {
   timer = setTimeout(() => update().catch(console.error), 150)
 }
 
-for (const el of [els.paper, els.title, els.subtitle, els.month, els.year, els.showGuides, els.showPageNumbers, els.highContrast]) {
+for (const el of [els.paper, els.title, els.subtitle, els.month, els.year, els.showGuides, els.showPageNumbers, els.showRuler, els.highContrast]) {
   el.addEventListener('input', scheduleUpdate)
 }
 

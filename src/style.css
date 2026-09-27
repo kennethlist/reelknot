@@ -99,21 +99,6 @@ body {
   cursor: pointer;
 }
 
-#download {
-  padding: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
-  background: var(--accent);
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-#download:hover {
-  filter: brightness(1.1);
-}
-
 #sidebar footer p {
   font-size: 11px;
   line-height: 1.5;
@@ -131,4 +116,231 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #fff;
+}
+
+/* --- shared buttons / nav --------------------------------------------------- */
+
+.nav {
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.nav a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.nav a:hover {
+  text-decoration: underline;
+}
+
+#sidebar footer a {
+  color: var(--accent);
+}
+
+.btn-primary,
+.btn-secondary {
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-primary {
+  color: #fff;
+  background: var(--accent);
+  border: none;
+}
+
+.btn-secondary {
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+}
+
+.btn-primary:hover:not(:disabled),
+.btn-secondary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-row .btn-primary {
+  flex: 1;
+}
+
+/* --- print maps --------------------------------------------------------------- */
+
+#map-pane {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+  background: #111;
+}
+
+.hint.warn {
+  color: #fbbf24;
+}
+
+.stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.stat strong {
+  color: var(--text);
+}
+
+.stat strong.over {
+  color: #f87171;
+}
+
+#progress {
+  margin-top: 12px;
+}
+
+.progress-text {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.progress {
+  height: 6px;
+  overflow: hidden;
+  background: var(--bg-raised);
+  border-radius: 3px;
+  margin-bottom: 6px;
+}
+
+.progress > div {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.3s;
+}
+
+#progress .btn-secondary {
+  width: 100%;
+  padding: 6px;
+  font-size: 12px;
+}
+
+.status {
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 10px;
+}
+
+.status.ok {
+  color: #4ade80;
+}
+
+.status.warn {
+  color: #fbbf24;
+}
+
+.status.error {
+  color: #f87171;
+}
+
+/* Per-grid style controls, indented under their on/off toggle. */
+.subrow {
+  display: flex;
+  gap: 6px;
+  margin: -2px 0 10px 24px;
+}
+
+.subrow select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.subrow select:disabled {
+  opacity: 0.45;
+}
+
+/* Generated-PDF preview overlaying the map. */
+#result {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  z-index: 1000; /* above Leaflet panes */
+}
+
+#result[hidden] {
+  display: none;
+}
+
+.result-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.result-bar span {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.result-bar button {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+#resultFrame {
+  flex: 1;
+  border: none;
+  background: #fff;
+}
+
+/* Sheet codes drawn in the centre of selected cells. */
+.leaflet-tooltip.print-sheet-code {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: #4338ca;
+  font-weight: 700;
+  font-size: 14px;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+}
+
+.leaflet-tooltip.print-sheet-code::before {
+  display: none;
 }

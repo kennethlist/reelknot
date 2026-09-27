@@ -11,6 +11,7 @@
       <header>
         <h1>ReelKnot</h1>
         <p class="tagline">Pocket booklet builder — 8 pages, one sheet, one cut.</p>
+        <p class="nav"><a href="/maps.html">Print topo maps &rarr;</a></p>
       </header>
 
       <section>
@@ -21,6 +22,7 @@
         </div>
         <label class="check"><input type="checkbox" id="showGuides" /> Fold &amp; cut guides</label>
         <label class="check"><input type="checkbox" id="showPageNumbers" /> Page numbers</label>
+        <label class="check"><input type="checkbox" id="showRuler" /> Ruler (in &amp; cm)</label>
         <label class="check"><input type="checkbox" id="highContrast" /> High contrast</label>
       </section>
 
@@ -49,10 +51,14 @@
 
       <section>
         <h2>Pages</h2>
+        <div class="field-row">
+          <label for="preset">Booklet</label>
+          <select id="preset"></select>
+        </div>
         <div id="pages"></div>
       </section>
 
-      <button id="download">Download PDF</button>
+      <button id="download" class="btn-primary">Download PDF</button>
 
       <footer>
         <p>Print at 100% scale. Fold in half 3 times to crease, unfold, cut the
