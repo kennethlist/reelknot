@@ -160,14 +160,43 @@ function makeCanvas(w, h) {
   return c
 }
 
-async function canvasToJpeg(canvas) {
+const isJpeg = (b) => b.length > 2 && b[0] === 0xff && b[1] === 0xd8
+const isPng = (b) => b.length > 4 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47
+
+async function encode(canvas, type) {
   let blob
   if (canvas.convertToBlob) {
-    blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: JPEG_QUALITY })
+    blob = await canvas.convertToBlob({ type, quality: JPEG_QUALITY })
   } else {
-    blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY))
+    blob = await new Promise((resolve) => canvas.toBlob(resolve, type, JPEG_QUALITY))
   }
+  if (!blob) throw new Error('canvas encoding failed (canvas readback blocked?)')
   return new Uint8Array(await blob.arrayBuffer())
+}
+
+/**
+ * Encode the rendered page as JPEG, returning { bytes, type }. Some browsers
+ * ignore the requested type on an OffscreenCanvas and hand back PNG, so the
+ * bytes are sniffed: retry through an ordinary <canvas>, and if that still
+ * isn't JPEG, keep the PNG (bigger file, still a valid page).
+ */
+async function canvasToImage(canvas) {
+  let bytes = await encode(canvas, 'image/jpeg')
+  if (isJpeg(bytes)) return { bytes, type: 'jpg' }
+  if (typeof document !== 'undefined' && canvas.convertToBlob) {
+    const el = document.createElement('canvas')
+    el.width = canvas.width
+    el.height = canvas.height
+    el.getContext('2d').drawImage(canvas, 0, 0)
+    const retry = await encode(el, 'image/jpeg')
+    if (isJpeg(retry)) return { bytes: retry, type: 'jpg' }
+    if (isPng(retry)) bytes = retry
+  }
+  if (isPng(bytes)) {
+    console.warn('Print Maps: this browser would not encode JPEG from canvas; embedding PNG instead.')
+    return { bytes, type: 'png' }
+  }
+  throw new Error('canvas produced neither JPEG nor PNG (a canvas-blocking extension?)')
 }
 
 /**
@@ -249,7 +278,7 @@ export function planTileCount(boxes, scale, dpi) {
 
 /**
  * Fetch, stitch and crop tiles for one box, resample to exactly outW x outH
- * pixels, apply the colour mode and return JPEG bytes. Tolerates a few missing
+ * pixels, apply the colour mode and return { bytes, type } ('jpg' or 'png'). Tolerates a few missing
  * tiles (left white); throws only if most fail, which reads as "could not reach
  * USGS". Aborts propagate as the signal's reason.
  */
@@ -323,5 +352,5 @@ export async function renderBoxImage(bbox, z, outW, outH, cache, colorMode, sign
     applyColorMode(img, colorMode)
     octx.putImageData(img, 0, 0)
   }
-  return canvasToJpeg(out)
+  return canvasToImage(out)
 }

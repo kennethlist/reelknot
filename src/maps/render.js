@@ -298,6 +298,11 @@ function drawAdjoining(page, r, label, adj, fonts) {
 
 // --- Pages ------------------------------------------------------------------
 
+/** Embed a rendered page image of either format pdf-lib supports. */
+function embedImage(doc, img) {
+  return img.type === 'png' ? doc.embedPng(img.bytes) : doc.embedJpg(img.bytes)
+}
+
 function placeImage(page, img, r) {
   page.drawImage(img, { x: r.x0, y: r.y0, width: r.width, height: r.height })
   page.drawRectangle({
@@ -321,11 +326,11 @@ async function renderSheet(doc, box, s, fonts, cache, ctx) {
     declination(clat, clon, ctx.signal),
     s.title ? null : quadInfo(bbox, ctx.signal),
   ])
-  const jpeg = await renderBoxImage(bbox, z, outW, outH, cache, s.color_mode, ctx.signal, ctx.onTile)
+  const img = await renderBoxImage(bbox, z, outW, outH, cache, s.color_mode, ctx.signal, ctx.onTile)
   const [decl, quad] = await meta
 
   const page = doc.addPage([r.W, r.H])
-  placeImage(page, await doc.embedJpg(jpeg), r)
+  placeImage(page, await embedImage(doc, img), r)
 
   const proj = makeProjector(bbox, r)
   const title = formatTitle(quad, box.label, s.title)
@@ -373,9 +378,9 @@ async function renderOverview(doc, s, fonts, cache, ctx) {
   const resTarget = mw / outW // mercator metres per output pixel
   const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(Math.log2((2 * MERC_MAX) / (256 * resTarget)))))
 
-  const jpeg = await renderBoxImage(bbox, z, outW, outH, cache, s.color_mode, ctx.signal, ctx.onTile)
+  const img = await renderBoxImage(bbox, z, outW, outH, cache, s.color_mode, ctx.signal, ctx.onTile)
   const page = doc.addPage([r.W, r.H])
-  placeImage(page, await doc.embedJpg(jpeg), r)
+  placeImage(page, await embedImage(doc, img), r)
 
   const proj = makeProjector(bbox, r)
   const accent = mono ? BLACK : ACCENT
