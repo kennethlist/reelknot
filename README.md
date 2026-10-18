@@ -2,7 +2,7 @@
 
 A pocket booklet builder: compose an 8-page booklet from templates (cover,
 lined, dot grid, graph, checklist, storyboard, logs, calendars, exercise
-sheets, reference tables, knots, blank), preview it live, and download a
+sheets, reference tables, knots, Magic: The Gathering score sheets, blank), preview it live, and download a
 print-ready PDF. All PDF generation happens in the
 browser with [pdf-lib](https://pdf-lib.js.org/).
 

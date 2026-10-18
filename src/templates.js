@@ -5,6 +5,8 @@ import {
   concatTransformationMatrix,
   LineCapStyle,
 } from 'pdf-lib'
+import { mtgLife, mtgCommander, mtgMatchLog, mtgReference, mtgColumns } from './games.js'
+import { ruleSheet } from './mtg-rules.js'
 import { ropeKnots, ropeKnots2, tautLine, prusik, cloveHitch, twoHalfHitches, truckersHitch, ropeNotes, fishingKnots, fishingKnots2, fishingKnots3 } from './knots.js'
 
 // All draw functions work in local coordinates: (0,0) is the bottom-left of
@@ -22,7 +24,7 @@ export const RULER_BAND = 22
 
 // Label bands (day tabs, header rows) are normally dark text on a gray fill;
 // high-contrast mode swaps them to white text on black.
-function bandColors(settings) {
+export function bandColors(settings) {
   return settings?.highContrast ? { bg: BLACK, fg: WHITE } : { bg: FAINT, fg: INK }
 }
 
@@ -212,7 +214,7 @@ function ledger({ page, w, h, font, bold, settings }, rowH = 15) {
 
 // Field-and-rule header used by the contact log: a small bold label with a
 // fill-in rule running to the end of the field. width 0 means "flex".
-function fillFields({ page, bold }, rows, { left, right, top, lineGap, size = 5.5, gap = 8 }) {
+export function fillFields({ page, bold }, rows, { left, right, top, lineGap, size = 5.5, gap = 8 }) {
   let y = top - lineGap
   for (const row of rows) {
     const flexCount = row.filter((f) => !f.width).length
@@ -237,7 +239,7 @@ function fillFields({ page, bold }, rows, { left, right, top, lineGap, size = 5.
 
 // Shared grid for the contact-log tables: header band, row rules, column
 // rules. cols entries are { label, width }; the one with width 0 flexes.
-function logTable({ page, bold }, cols, { left, right, top, bottom, rowH, headerH = 13, size = 6, bg, fg }) {
+export function logTable({ page, bold }, cols, { left, right, top, bottom, rowH, headerH = 13, size = 6, bg, fg }) {
   const flex = cols.find((c) => !c.width)
   if (flex) flex.width = right - left - cols.reduce((sum, c) => sum + c.width, 0)
 
@@ -2711,7 +2713,7 @@ const ROMAN = [
 const romanSheet = (ctx) => refSheet(ctx, { title: 'Roman numerals and bases', sections: ROMAN })
 
 // Dropdown groups, in display order.
-export const GROUPS = ['Cover & notes', 'Planner', 'Logs', 'Reference', 'Ham radio', 'Knots', 'Exercise']
+export const GROUPS = ['Cover & notes', 'Planner', 'Logs', 'Reference', 'Ham radio', 'Knots', 'Exercise', 'Games']
 
 export const TEMPLATES = {
   cover: { label: 'Cover', group: 'Cover & notes', draw: cover },
@@ -2779,4 +2781,19 @@ export const TEMPLATES = {
   fourWeeks: { label: 'Next 4 weeks', group: 'Planner', draw: fourWeeks, usesWeek: true },
   fourWeeksWide: { label: 'Next 4 weeks (horizontal)', group: 'Planner', draw: fourWeeksWide, usesWeek: true },
   year: { label: 'Year calendar', group: 'Planner', draw: yearCalendar },
+  mtgLife: { label: 'MTG life tracker (2 games)', group: 'Games', draw: mtgLife },
+  mtgLifeRoomy: { label: 'MTG life tracker (1 game)', group: 'Games', draw: (ctx) => mtgLife(ctx, { games: 1 }) },
+  mtgCommander: { label: 'MTG Commander pod (4 players)', group: 'Games', draw: mtgCommander },
+  mtgColumns: { label: 'MTG life columns (2 games)', group: 'Games', draw: (ctx) => mtgColumns(ctx, { names: ['Me', 'Opp', 'Me', 'Opp'], games: 2 }) },
+  mtgColumns1: { label: 'MTG life columns (1 game)', group: 'Games', draw: mtgColumns },
+  mtgColumns4: { label: 'MTG life columns (4 players)', group: 'Games', draw: (ctx) => mtgColumns(ctx, { names: ['', '', '', ''], start: 40 }) },
+  mtgMatchLog: { label: 'MTG match log', group: 'Games', draw: mtgMatchLog },
+  mtgReference: { label: 'MTG quick rules', group: 'Games', draw: mtgReference },
+  mtgRulesTurn: { label: 'MTG rules: turn and stack', group: 'Games', draw: (ctx) => ruleSheet(ctx, 'mtgRulesTurn') },
+  mtgRulesCombat: { label: 'MTG rules: combat', group: 'Games', draw: (ctx) => ruleSheet(ctx, 'mtgRulesCombat') },
+  mtgRulesKeywords: { label: 'MTG rules: keywords and tokens', group: 'Games', draw: (ctx) => ruleSheet(ctx, 'mtgRulesKeywords') },
+  mtgRulesZones: { label: 'MTG rules: cards, zones, state', group: 'Games', draw: (ctx) => ruleSheet(ctx, 'mtgRulesZones') },
+  mtgRulesCommander: { label: 'MTG rules: Commander, multiplayer', group: 'Games', draw: (ctx) => ruleSheet(ctx, 'mtgRulesCommander') },
+  mtgRulesRulings: { label: 'MTG rules: common rulings', group: 'Games', draw: (ctx) => ruleSheet(ctx, 'mtgRulesRulings') },
+  mtgRulesEvents: { label: 'MTG rules: Limited and events', group: 'Games', draw: (ctx) => ruleSheet(ctx, 'mtgRulesEvents') },
 }

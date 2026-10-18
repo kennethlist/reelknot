@@ -42,6 +42,22 @@ const PRESETS = {
     pages: ['ropeKnots', 'ropeKnots2', 'cloveHitch', 'truckersHitch', 'tautLine', 'prusik', 'fishingKnots', 'fishingKnots2'],
     showRuler: true,
   },
+  mtg: {
+    label: 'Magic: The Gathering',
+    pages: ['mtgReference', 'mtgLife', 'mtgLife', 'mtgLife', 'mtgCommander', 'mtgCommander', 'mtgMatchLog', 'mtgMatchLog'],
+  },
+  mtgCommander: {
+    label: 'MTG Commander score card',
+    pages: ['mtgReference', 'mtgCommander', 'mtgCommander', 'mtgCommander', 'mtgColumns4', 'mtgColumns4', 'mtgCommander', 'mtgCommander'],
+  },
+  mtgLimited: {
+    label: 'MTG Limited score card',
+    pages: ['mtgReference', 'mtgLife', 'mtgLife', 'mtgLife', 'mtgColumns', 'mtgColumns', 'mtgMatchLog', 'mtgMatchLog'],
+  },
+  mtgRules: {
+    label: 'MTG rules booklet',
+    pages: ['mtgReference', 'mtgRulesTurn', 'mtgRulesCombat', 'mtgRulesKeywords', 'mtgRulesZones', 'mtgRulesCommander', 'mtgRulesRulings', 'mtgRulesEvents'],
+  },
 }
 const DEFAULT_PRESET = 'planner'
 
