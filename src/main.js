@@ -15,6 +15,11 @@ const PRESETS = {
     // Page 1 leads with next week; pages 3 and 7 anchor to the current week.
     weeks: ['1', 'auto', '0', 'auto', 'auto', 'auto', '0', 'auto'],
   },
+  notes: {
+    label: 'Notes',
+    pages: ['dotgrid', 'dotgrid', 'lined', 'lined', 'lined', 'lined', 'lined', 'lined'],
+    showRuler: true,
+  },
   reference: {
     label: 'Reference',
     pages: ['conversions', 'shopTable', 'tempTable', 'weights', 'speedTable', 'areaSheet', 'kitchenSheet', 'mathSheet'],
