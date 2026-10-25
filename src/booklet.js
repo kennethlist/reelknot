@@ -152,12 +152,13 @@ export async function generateBooklet(settings) {
 // page's fore-edge (bottom-left for page 6, top-right for page 2).
 //
 // Most printers can't print within ~5 mm of the paper edge, so the scale
-// line is inset and the ticks point inward; the paper edge itself is zero,
-// and every printed tick is the correct distance from it.
+// line is inset and the ticks point inward. The scale's zero is a printed
+// tick just clear of the unprintable strip, not the paper edge, so the
+// ruler is read from its own 0 mark like a hand ruler.
 const RULER_INSET = RULER_BAND - 8
 // Content is lifted by this much so a page's usual bottom margin clears the
-// ruler's labels, and the ruler itself stops short of the unprintable strip
-// at the left and right paper edges (its zero stays at the edge).
+// ruler's labels, and the ruler starts and stops this far in from the left
+// and right paper edges, clear of the unprintable strip.
 const RULER_LIFT = 14
 const RULER_PAD = 14
 const RULER = rgb(0.35, 0.38, 0.42)
@@ -190,23 +191,25 @@ function drawRulers(page, font, W, H) {
   page.pushOperators(popGraphicsState())
 }
 
-// Draws one scale from x = 0 (the paper edge) along y, with `unit` points per
-// tick; `major` ticks get a label, and `tick(i)` gives the other lengths.
-// The scale line runs from the first tick clear of the unprintable strip to
-// the last one, so it starts and ends on a tick whatever the unit.
+// Draws one scale along y with its 0 tick at x = RULER_PAD and `unit`
+// points per tick; `major` ticks get a label, and `tick(i)` gives the other
+// lengths. The scale line runs from the 0 tick to the last tick clear of the
+// unprintable strip at the far edge, so it ends on a tick whatever the unit.
 function drawScale(page, font, { length, y, unit, major, tick, label, name }) {
-  const first = Math.ceil(RULER_PAD / unit)
-  const last = Math.floor((length - RULER_PAD) / unit)
-  page.drawLine({ start: { x: first * unit, y }, end: { x: last * unit, y }, thickness: 0.5, color: RULER })
-  for (let i = first; i <= last; i++) {
-    const x = i * unit
+  const origin = RULER_PAD
+  const last = Math.floor((length - 2 * RULER_PAD) / unit)
+  page.drawLine({ start: { x: origin, y }, end: { x: origin + last * unit, y }, thickness: 0.5, color: RULER })
+  for (let i = 0; i <= last; i++) {
+    const x = origin + i * unit
     const len = i % major === 0 ? 7 : tick(i)
     page.drawLine({ start: { x, y }, end: { x, y: y + len }, thickness: 0.4, color: RULER })
     if (i % major === 0) {
       page.drawText(label(i), { x: x + 1.5, y: y + len - 3.5, size: 4, font, color: RULER })
     }
   }
-  page.drawText(name, { x: first * unit + 1.5, y: y + 3, size: 4, font, color: RULER })
+  // Unit name sits just past the "0" label so the two don't collide.
+  const nameX = origin + 1.5 + font.widthOfTextAtSize(label(0), 4) + 2
+  page.drawText(name, { x: nameX, y: y + 3, size: 4, font, color: RULER })
 }
 
 function drawGuides(page, font, W, H) {
