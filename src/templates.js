@@ -1037,6 +1037,77 @@ function drawMonthPage({ page, font, bold, settings, monthTotal }, w, h, { check
   }
 }
 
+function twoMonths({ page, w, h, font, bold, settings, monthTotal }) {
+  // Sideways: turn the booklet 90° clockwise to read it. This month and the
+  // next sit side by side as bare dates under a day-of-week heading.
+  page.pushOperators(pushGraphicsState(), concatTransformationMatrix(0, 1, -1, 0, w, 0))
+  const lw = h
+  const lh = w
+  const first = monthTotal ?? settings.year * 12 + settings.month
+  const { bg, fg } = bandColors(settings)
+
+  const gap = 14
+  const blockW = (lw - 2 * MARGIN - gap) / 2
+  const colW = blockW / 7
+  const titleSize = 10
+  const headerH = 12
+  const daySize = 8
+  const rows = 6
+  const headerTop = lh - MARGIN - titleSize - 8
+  const rowH = (headerTop - headerH - MARGIN) / rows
+
+  for (let b = 0; b < 2; b++) {
+    const total = first + b
+    const month = total % 12
+    const year = Math.floor(total / 12)
+    const bx = MARGIN + b * (blockW + gap)
+
+    const title = `${MONTHS[month]} ${year}`
+    page.drawText(title, {
+      x: bx + (blockW - bold.widthOfTextAtSize(title, titleSize)) / 2,
+      y: lh - MARGIN - titleSize,
+      size: titleSize,
+      font: bold,
+      color: INK,
+    })
+
+    page.drawRectangle({
+      x: bx,
+      y: headerTop - headerH,
+      width: blockW,
+      height: headerH,
+      color: bg,
+    })
+    for (let c = 0; c < 7; c++) {
+      const label = WEEKDAYS_SHORT[c]
+      page.drawText(label, {
+        x: bx + c * colW + (colW - bold.widthOfTextAtSize(label, 6)) / 2,
+        y: headerTop - 8.5,
+        size: 6,
+        font: bold,
+        color: fg,
+      })
+    }
+
+    const firstDay = new Date(year, month, 1).getDay()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    for (let d = 1; d <= daysInMonth; d++) {
+      const idx = firstDay + d - 1
+      const r = Math.floor(idx / 7)
+      const c = idx % 7
+      const label = String(d)
+      page.drawText(label, {
+        x: bx + c * colW + (colW - font.widthOfTextAtSize(label, daySize)) / 2,
+        y: headerTop - headerH - r * rowH - (rowH + daySize * 0.7) / 2,
+        size: daySize,
+        font,
+        color: INK,
+      })
+    }
+  }
+  page.pushOperators(popGraphicsState())
+}
+
 function fourWeeks(ctx) {
   drawFourWeeks(ctx, ctx.w, ctx.h)
 }
@@ -2778,6 +2849,7 @@ export const TEMPLATES = {
   calendarCheck: { label: 'Month + checkboxes', group: 'Planner', draw: (ctx) => calendar(ctx, { checkboxes: true }), usesMonth: true },
   calendarWide: { label: 'Month (horizontal)', group: 'Planner', draw: calendarWide, usesMonth: true },
   calendarWideCheck: { label: 'Month (horizontal) + checkboxes', group: 'Planner', draw: (ctx) => calendarWide(ctx, { checkboxes: true }), usesMonth: true },
+  twoMonths: { label: 'Two months (horizontal, dates only)', group: 'Planner', draw: twoMonths, usesMonth: true, monthSpan: 2 },
   fourWeeks: { label: 'Next 4 weeks', group: 'Planner', draw: fourWeeks, usesWeek: true },
   fourWeeksWide: { label: 'Next 4 weeks (horizontal)', group: 'Planner', draw: fourWeeksWide, usesWeek: true },
   year: { label: 'Year calendar', group: 'Planner', draw: yearCalendar },

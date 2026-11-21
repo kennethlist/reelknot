@@ -110,7 +110,8 @@ export async function generateBooklet(settings) {
             ? settings.year * 12 + settings.month
             : prevMonthTotal + 1
           : settings.year * 12 + Number(choice)
-      prevMonthTotal = monthTotal
+      // A page showing several months moves the next 'auto' page past them.
+      prevMonthTotal = monthTotal + (template.monthSpan ?? 1) - 1
     }
     let weekDate
     if (template.usesWeek && settings.weekStart != null) {

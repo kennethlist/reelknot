@@ -11,9 +11,9 @@ const MONTHS = [
 const PRESETS = {
   planner: {
     label: 'Planner',
-    pages: ['weekSplit', 'address', 'fourWeeksWide', 'ledger', 'ledger', 'lined', 'weekSplit', 'lined'],
-    // Page 1 leads with next week; pages 3 and 7 anchor to the current week.
-    weeks: ['1', 'auto', '0', 'auto', 'auto', 'auto', '0', 'auto'],
+    pages: ['weekSplit', 'address', 'twoMonths', 'ledger', 'ledger', 'lined', 'weekSplit', 'lined'],
+    // Page 1 leads with next week; page 7 anchors to the current week.
+    weeks: ['1', 'auto', 'auto', 'auto', 'auto', 'auto', '0', 'auto'],
   },
   notes: {
     label: 'Notes',
