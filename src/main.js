@@ -17,7 +17,7 @@ const PRESETS = {
   },
   notes: {
     label: 'Notes',
-    pages: ['dotgrid', 'dotgrid', 'lined', 'lined', 'lined', 'lined', 'lined', 'lined'],
+    pages: ['dotgrid', 'dotgrid', 'lined', 'lined', 'lined', 'lined', 'blank', 'blank'],
     showRuler: true,
   },
   reference: {
